@@ -36,7 +36,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
         var id = new Id(1);
         _scheduler = new DedicatedTaskScheduler(id);
         _client = new TsFullClient(_scheduler);
-        _voiceTarget = new Ts3VoiceTarget(_client);
+        _voiceTarget = new Ts3VoiceTarget(_client, logger);
         _client.OnDisconnected += OnClientDisconnected;
     }
 

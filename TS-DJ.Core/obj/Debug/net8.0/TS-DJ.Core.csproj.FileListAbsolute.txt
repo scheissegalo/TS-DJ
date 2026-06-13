@@ -9,3 +9,4 @@
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/Debug/net8.0/refint/TS-DJ.Core.dll
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/Debug/net8.0/TS-DJ.Core.pdb
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/Debug/net8.0/ref/TS-DJ.Core.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/Debug/net8.0/TS-DJ.Core.sourcelink.json

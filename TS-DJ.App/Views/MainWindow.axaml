@@ -56,6 +56,11 @@
                     <TextBlock Grid.Column="1" Text="{Binding PlaybackStatus}" VerticalAlignment="Center" Opacity="0.8"/>
                 </Grid>
 
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <TextBlock Grid.Column="0" Text="Now playing" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding NowPlayingDisplay}" VerticalAlignment="Center" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                </Grid>
+
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Button Grid.Column="0" Content="Browse…" Command="{Binding BrowseFileCommand}" IsEnabled="{Binding CanBrowse}"/>
                     <TextBlock Grid.Column="1" Text="{Binding SelectedFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Opacity="0.85"/>
@@ -68,10 +73,36 @@
                 </StackPanel>
 
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <TextBlock Grid.Column="0" Text="Volume" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0" Text="Music volume" VerticalAlignment="Center"/>
                     <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
                     <TextBlock Grid.Column="2" Text="{Binding Volume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
                 </Grid>
+
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <TextBlock Grid.Column="0" Text="Master volume" VerticalAlignment="Center"/>
+                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding MasterVolume}" TickFrequency="10"/>
+                    <TextBlock Grid.Column="2" Text="{Binding MasterVolume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <TextBlock Grid.Column="0" Text="Opus bitrate" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding OpusBitrateOptions}"
+                              SelectedItem="{Binding SelectedOpusBitrate}"
+                              HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Column="2" Text="{Binding OpusBitrateDisplay}" VerticalAlignment="Center" MinWidth="120" Opacity="0.85"/>
+                </Grid>
+
+                <DockPanel LastChildFill="True" MinHeight="80">
+                    <TextBlock DockPanel.Dock="Top" Text="Queue" Margin="0,0,0,4" Opacity="0.85"/>
+                    <ListBox ItemsSource="{Binding QueueItems}" MinHeight="72">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayText}" TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
             </StackPanel>
         </Border>
 
@@ -89,6 +120,6 @@
             </DockPanel>
         </Border>
 
-        <TextBlock Grid.Row="3" Text="TS-DJ — Phase 2" Opacity="0.5" HorizontalAlignment="Right"/>
+        <TextBlock Grid.Row="3" Text="TS-DJ — Phase 3" Opacity="0.5" HorizontalAlignment="Right"/>
     </Grid>
 </Window>

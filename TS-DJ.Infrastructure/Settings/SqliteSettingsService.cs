@@ -128,6 +128,60 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
         }
     }
 
+    public async Task<AudioSettings> LoadAudioSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, AudioSettings.OpusBitrateKbpsKey, cancellationToken);
+            var kbps = int.TryParse(raw, out var parsed)
+                ? TS_DJ.Core.Audio.OpusBitratePresets.Normalize(parsed)
+                : TS_DJ.Core.Audio.OpusBitratePresets.Default;
+
+            _logger.LogDebug("Loaded audio settings from {DatabasePath}", _databasePath);
+            return new AudioSettings { OpusBitrateKbps = kbps };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load audio settings from {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not load audio settings from '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SaveAudioSettingsAsync(AudioSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+            var kbps = TS_DJ.Core.Audio.OpusBitratePresets.Normalize(settings.OpusBitrateKbps);
+            await WriteSettingAsync(connection, transaction, AudioSettings.OpusBitrateKbpsKey, kbps.ToString(), cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Saved audio settings to {DatabasePath}", _databasePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save audio settings to {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not save audio settings to '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task<string?> GetSettingAsync(string key, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(key))

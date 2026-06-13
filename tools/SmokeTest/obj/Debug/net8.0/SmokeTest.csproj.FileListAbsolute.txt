@@ -74,3 +74,4 @@
 /media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/obj/Debug/net8.0/ref/SmokeTest.dll
 /media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/NLayer.dll
 /media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/NLayer.NAudioSupport.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/obj/Debug/net8.0/SmokeTest.sourcelink.json

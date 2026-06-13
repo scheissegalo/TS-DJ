@@ -17,3 +17,4 @@
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/obj/Debug/net8.0/ref/TS-DJ.Audio.dll
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/bin/Debug/net8.0/TS-DJ.TeamSpeak.dll
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/bin/Debug/net8.0/TS-DJ.TeamSpeak.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/obj/Debug/net8.0/TS-DJ.Audio.sourcelink.json

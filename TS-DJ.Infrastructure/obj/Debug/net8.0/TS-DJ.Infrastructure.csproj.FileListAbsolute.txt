@@ -13,3 +13,4 @@
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Debug/net8.0/refint/TS-DJ.Infrastructure.dll
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Debug/net8.0/TS-DJ.Infrastructure.pdb
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Debug/net8.0/ref/TS-DJ.Infrastructure.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Debug/net8.0/TS-DJ.Infrastructure.sourcelink.json

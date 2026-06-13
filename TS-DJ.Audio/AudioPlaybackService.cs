@@ -2,38 +2,38 @@ using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
 using TS_DJ.TeamSpeak;
-using TSLib.Helper;
 
 namespace TS_DJ.Audio;
 
+/// <summary>
+/// Backward-compatible facade over <see cref="Mixing.AudioMixerService"/>.
+/// Orchestrates queue playback state for UI and CLI consumers.
+/// </summary>
 public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 {
     private readonly ILogger<AudioPlaybackService> _logger;
-    private readonly ILogger<NaudioFileProducer> _producerLogger;
+    private readonly IAudioMixerService _mixer;
     private readonly TeamSpeakService _teamSpeak;
-    private readonly AudioPipeline _pipeline;
-    private NaudioFileProducer? _producer;
     private PlaybackState _state = PlaybackState.Stopped;
-    private string? _currentFilePath;
     private float _volume = AudioValues.HumanVolumeToFactor(50f);
 
     public AudioPlaybackService(
         ILogger<AudioPlaybackService> logger,
-        ILogger<NaudioFileProducer> producerLogger,
+        IAudioMixerService mixer,
         TeamSpeakService teamSpeak)
     {
         _logger = logger;
-        _producerLogger = producerLogger;
+        _mixer = mixer;
         _teamSpeak = teamSpeak;
-        _pipeline = new AudioPipeline(new Id(2));
-        _pipeline.SetTarget(teamSpeak.VoiceTarget);
-        _pipeline.SetVolume(50f);
 
+        _mixer.Music.Volume = _volume;
+        _mixer.NowPlayingChanged += OnNowPlayingChanged;
+        _mixer.QueueChanged += OnQueueChanged;
         _teamSpeak.StateChanged += OnTeamSpeakStateChanged;
     }
 
     public PlaybackState State => _state;
-    public string? CurrentFilePath => _currentFilePath;
+    public string? CurrentFilePath => _mixer.NowPlaying?.FilePath;
 
     public float Volume
     {
@@ -41,29 +41,45 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         set
         {
             _volume = Math.Clamp(value, 0f, 1f);
-            _pipeline.SetVolume(AudioValues.FactorToHumanVolume(_volume));
-            _logger.LogDebug("Volume set to {Volume:P0}", _volume);
+            _mixer.Music.Volume = _volume;
+            _logger.LogDebug("Music volume set to {Volume:P0}", _volume);
         }
     }
 
     public event EventHandler<PlaybackState>? StateChanged;
 
-    public Task LoadAsync(string filePath, CancellationToken cancellationToken = default)
+    public async Task LoadAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException("Audio file not found.", filePath);
+        _mixer.Enqueue(filePath);
+        _logger.LogInformation(
+            "Enqueued via LoadAsync: {FilePath} (queue size={QueueSize})",
+            filePath, _mixer.Queue.Count);
 
-        _currentFilePath = filePath;
-        SetState(PlaybackState.Stopped);
-        _logger.LogInformation("Loaded audio file: {FilePath}", filePath);
-        return Task.CompletedTask;
+        // Auto-start when connected and the mixer is idle (browse-to-play).
+        // If something is already playing, the new track stays Queued for auto-advance.
+        if (!_teamSpeak.Client.Connected)
+            return;
+
+        if (_mixer.Music.IsPlaying)
+        {
+            _logger.LogInformation(
+                "LoadAsync: mixer already playing — {FilePath} queued for auto-advance",
+                filePath);
+            return;
+        }
+
+        if (!_mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued))
+            return;
+
+        await PlayAsync(cancellationToken);
     }
 
     public Task PlayAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_currentFilePath))
+        var hasQueued = _mixer.Queue.Any(item => item.Status == PlaybackQueueStatus.Queued);
+        if (!hasQueued && !_mixer.Music.IsPlaying)
         {
-            _logger.LogWarning("Play requested but no file is loaded");
+            _logger.LogWarning("Play requested but queue is empty");
             return Task.CompletedTask;
         }
 
@@ -75,23 +91,25 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
         try
         {
-            StopInternal();
+            _logger.LogInformation("PlayAsync requested (state={State}, music.IsPlaying={IsPlaying})",
+                _state, _mixer.Music.IsPlaying);
 
-            _producer = new NaudioFileProducer(_producerLogger);
-            _producer.SongEnded += OnSongEnded;
-            _producer.Open(_currentFilePath);
+            _mixer.Start();
 
-            _pipeline.SetSource(_producer);
-            _pipeline.ResetTimer();
-            _pipeline.Start();
-
-            SetState(PlaybackState.Playing);
-            _logger.LogInformation("Playback started: {FilePath}", _currentFilePath);
+            if (_mixer.Music.IsPlaying)
+            {
+                SetState(PlaybackState.Playing);
+                _logger.LogInformation("Playback started: {FilePath}", CurrentFilePath);
+            }
+            else if (!_mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued))
+            {
+                _logger.LogWarning("Play requested but no playable queued tracks remain");
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start playback for {FilePath}", _currentFilePath);
-            StopInternal();
+            _logger.LogError(ex, "Failed to start playback");
+            _mixer.Stop();
             SetState(PlaybackState.Stopped);
         }
 
@@ -103,7 +121,7 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         if (_state != PlaybackState.Playing)
             return Task.CompletedTask;
 
-        _pipeline.Pause();
+        _mixer.Pause();
         SetState(PlaybackState.Paused);
         _logger.LogInformation("Playback paused");
         return Task.CompletedTask;
@@ -111,28 +129,126 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
-        StopInternal();
+        // Mark stopped before mixer events fire — prevents auto-restart of queued tracks.
         SetState(PlaybackState.Stopped);
+        _mixer.Stop();
         _logger.LogInformation("Playback stopped");
         return Task.CompletedTask;
     }
 
-    private void StopInternal()
+    private void OnNowPlayingChanged(object? sender, EventArgs e)
     {
-        _pipeline.Pause();
-        if (_producer != null)
+        _logger.LogInformation(
+            "NowPlayingChanged: nowPlaying={NowPlaying}, music.IsPlaying={IsPlaying}, state={State}",
+            _mixer.NowPlaying?.DisplayName ?? "none",
+            _mixer.Music.IsPlaying,
+            _state);
+
+        SyncPlaybackState("NowPlayingChanged");
+        TryContinueQueue("NowPlayingChanged");
+    }
+
+    private void OnQueueChanged(object? sender, EventArgs e)
+    {
+        var queued = _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
+        var playing = _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Playing);
+        var played = _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Played);
+
+        _logger.LogInformation(
+            "QueueChanged: total={Total}, queued={Queued}, playing={Playing}, played={Played}",
+            _mixer.Queue.Count, queued, playing, played);
+
+        SyncPlaybackState("QueueChanged");
+        TryContinueQueue("QueueChanged");
+    }
+
+    /// <summary>
+    /// Keeps playback state aligned with the mixer — never mark Stopped while queued tracks remain.
+    /// </summary>
+    private void SyncPlaybackState(string reason)
+    {
+        if (_state == PlaybackState.Paused)
+            return;
+
+        var isActivelyPlaying = _mixer.Music.IsPlaying && _mixer.NowPlaying is not null;
+        var hasQueued = _mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
+        var hasWaitingTrack = hasQueued
+            || _mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Playing);
+
+        if (isActivelyPlaying)
         {
-            _producer.SongEnded -= OnSongEnded;
-            _pipeline.ClearSource();
-            _producer = null;
+            SetState(PlaybackState.Playing);
+            _logger.LogDebug("SyncPlaybackState ({Reason}): Playing {FilePath}", reason, _mixer.NowPlaying!.FilePath);
+            return;
+        }
+
+        // Session thinks it's playing but the mixer went idle — try to recover once.
+        if (_state == PlaybackState.Playing && hasWaitingTrack && _teamSpeak.Client.Connected)
+        {
+            _logger.LogInformation(
+                "SyncPlaybackState ({Reason}): facade Playing but mixer idle — calling Start()",
+                reason);
+            _mixer.Start();
+
+            if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
+            {
+                SetState(PlaybackState.Playing);
+                return;
+            }
+        }
+
+        if (hasQueued)
+        {
+            _logger.LogDebug(
+                "SyncPlaybackState ({Reason}): idle with {Queued} queued — holding state {State}",
+                reason, _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Queued), _state);
+            return;
+        }
+
+        if (_state == PlaybackState.Playing || _state == PlaybackState.Paused)
+        {
+            SetState(PlaybackState.Stopped);
+            _logger.LogInformation("SyncPlaybackState ({Reason}): queue empty/idle — Stopped", reason);
         }
     }
 
-    private void OnSongEnded(object? sender, EventArgs e)
+    /// <summary>
+    /// Safety net during an active session: if the mixer went idle while queued tracks remain, start the next track.
+    /// Never runs after the user explicitly stopped (state == Stopped).
+    /// </summary>
+    private void TryContinueQueue(string reason)
     {
-        _logger.LogInformation("Playback finished (end of file)");
-        StopInternal();
-        SetState(PlaybackState.Stopped);
+        if (_state != PlaybackState.Playing)
+            return;
+
+        if (!_teamSpeak.Client.Connected)
+            return;
+
+        var hasQueued = _mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
+        var isActivelyPlaying = _mixer.Music.IsPlaying && _mixer.NowPlaying is not null;
+
+        if (!hasQueued || isActivelyPlaying)
+            return;
+
+        _logger.LogInformation(
+            "TryContinueQueue ({Reason}): {Queued} track(s) queued but nothing playing — calling Start()",
+            reason, _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
+
+        _mixer.Start();
+
+        if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
+        {
+            SetState(PlaybackState.Playing);
+            _logger.LogInformation(
+                "TryContinueQueue ({Reason}): advanced to {FilePath}",
+                reason, _mixer.NowPlaying.FilePath);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "TryContinueQueue ({Reason}): Start() did not begin playback",
+                reason);
+        }
     }
 
     private void OnTeamSpeakStateChanged(object? sender, ConnectionState state)
@@ -146,14 +262,15 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         if (_state == state)
             return;
 
+        _logger.LogDebug("Playback state transition: {OldState} → {NewState}", _state, state);
         _state = state;
         StateChanged?.Invoke(this, state);
     }
 
     public void Dispose()
     {
+        _mixer.NowPlayingChanged -= OnNowPlayingChanged;
+        _mixer.QueueChanged -= OnQueueChanged;
         _teamSpeak.StateChanged -= OnTeamSpeakStateChanged;
-        StopInternal();
-        _pipeline.Dispose();
     }
 }

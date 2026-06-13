@@ -1,7 +1,8 @@
+using Microsoft.Extensions.Logging;
 using TSLib;
 using TSLib.Audio;
 using TSLib.Helper;
-using TSLib.Scheduler;
+using TS_DJ.Core.Audio;
 
 namespace TS_DJ.Audio;
 
@@ -12,7 +13,7 @@ namespace TS_DJ.Audio;
 public sealed class AudioPipeline : IDisposable
 {
     private const Codec SendCodec = Codec.OpusMusic;
-    private const int DefaultBitrate = 48000;
+    private readonly ILogger? _logger;
 
     public CheckActivePipe CheckActivePipe { get; }
     public VolumePipe VolumePipe { get; }
@@ -20,12 +21,15 @@ public sealed class AudioPipeline : IDisposable
     public PreciseTimedPipe TimePipe { get; }
 
     public IAudioPassiveProducer? Source { get; private set; }
+    public bool IsTransmitting => !TimePipe.Paused;
 
-    public AudioPipeline(Id id)
+    public AudioPipeline(Id id, ILogger? logger = null)
     {
+        _logger = logger;
+
         CheckActivePipe = new CheckActivePipe();
         VolumePipe = new VolumePipe();
-        EncoderPipe = new EncoderPipe(SendCodec) { Bitrate = DefaultBitrate };
+        EncoderPipe = new EncoderPipe(SendCodec) { Bitrate = OpusBitratePresets.Default * 1000 };
         TimePipe = new PreciseTimedPipe(EncoderPipe, id) { ReadBufferSize = EncoderPipe.PacketSize };
 
         TimePipe.Chain(CheckActivePipe).Chain(VolumePipe).Chain(EncoderPipe);
@@ -35,23 +39,52 @@ public sealed class AudioPipeline : IDisposable
     {
         Source = source;
         source.Into(TimePipe);
+        _logger?.LogDebug("AudioPipeline source connected to PreciseTimedPipe");
     }
 
     public void SetTarget(IAudioPassiveConsumer target)
     {
         EncoderPipe.Chain(target);
+        _logger?.LogDebug("AudioPipeline encoder connected to voice target");
     }
 
-    public void SetVolume(float humanVolume)
+    public void SetMasterVolume(float humanVolume)
     {
         VolumePipe.Volume = AudioValues.HumanVolumeToFactor(humanVolume);
     }
 
-    public void Start() => TimePipe.Paused = false;
+    public void SetEncoderBitrate(int kbps)
+    {
+        var bps = OpusBitratePresets.Normalize(kbps) * 1000;
+        EncoderPipe.Bitrate = bps;
+        _logger?.LogInformation("EncoderPipe bitrate set to {BitrateBps} bps ({BitrateKbps} kbps)", bps, kbps);
+    }
 
-    public void Pause() => TimePipe.Paused = true;
+    public int EncoderBitrateKbps => EncoderPipe.Bitrate / 1000;
+
+    public void Start()
+    {
+        TimePipe.Paused = false;
+        _logger?.LogInformation("PreciseTimedPipe started — will request audio frames from source");
+    }
+
+    public void Pause()
+    {
+        TimePipe.Paused = true;
+        _logger?.LogInformation("PreciseTimedPipe paused — will stop requesting audio frames");
+    }
 
     public void ResetTimer() => TimePipe.AudioTimer.Reset();
+
+    public void ResyncForNewTrack()
+    {
+        if (TimePipe.Paused)
+            ResetTimer();
+        else
+            TimePipe.AudioTimer.ResetRemoteBuffer();
+
+        _logger?.LogInformation("Pipeline timer resynced for new track");
+    }
 
     public void ClearSource()
     {

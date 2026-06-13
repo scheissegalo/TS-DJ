@@ -1,0 +1,423 @@
+using Microsoft.Extensions.Logging;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+using TS_DJ.Audio.Mixing.Sources;
+using TS_DJ.Core.Audio;
+using TS_DJ.Core.Models;
+using TS_DJ.Core.Services;
+using TS_DJ.TeamSpeak;
+using TSLib.Helper;
+
+namespace TS_DJ.Audio.Mixing;
+
+public sealed class AudioMixerService : IAudioMixerService
+{
+    private readonly ILogger<AudioMixerService> _logger;
+    private readonly AudioPipeline _pipeline;
+    private readonly TeamSpeakService _teamSpeak;
+    private readonly object _sync = new();
+    private readonly MixingSampleProvider _mixer;
+    private readonly MixerOutputProducer _outputProducer;
+    private readonly List<PlaybackQueueItem> _queue = [];
+    private float _masterVolume = AudioValues.HumanVolumeToFactor(50f);
+    private int _encoderBitrateKbps = OpusBitratePresets.Default;
+    private PlaybackQueueItem? _nowPlaying;
+    private bool _isPaused;
+    private const int StalledReadThreshold = 50;
+
+    public AudioMixerService(
+        ILogger<AudioMixerService> logger,
+        ILogger<MusicTrackSource> musicLogger,
+        ILogger<SoundEffectSource> soundboardLogger,
+        ILogger<MixerOutputProducer> outputLogger,
+        TeamSpeakService teamSpeak,
+        Id pipelineId)
+    {
+        _logger = logger;
+        _teamSpeak = teamSpeak;
+
+        var format = WaveFormat.CreateIeeeFloatWaveFormat(AudioFormat.SampleRate, AudioFormat.Channels);
+        _mixer = new MixingSampleProvider(format)
+        {
+            ReadFully = false
+        };
+
+        Music = new MusicTrackSource("music", "Music", _mixer, _sync, musicLogger);
+        Soundboard = new SoundEffectSource("soundboard", "Soundboard", _mixer, _sync, soundboardLogger);
+        Microphone = new MicrophoneSource("microphone", "Microphone");
+
+        _outputProducer = new MixerOutputProducer(
+            _mixer,
+            _sync,
+            HasActiveAudioLocked,
+            ProcessLifecycleLocked,
+            () =>
+            {
+                if (Soundboard is SoundEffectSource soundboard)
+                    soundboard.TickCleanup();
+            },
+            Music.NotifyMixedRead,
+            outputLogger);
+
+        _pipeline = new AudioPipeline(pipelineId, logger);
+        _pipeline.SetTarget(teamSpeak.VoiceTarget);
+        _pipeline.SetSource(_outputProducer);
+        _pipeline.SetMasterVolume(50f);
+        _pipeline.SetEncoderBitrate(_encoderBitrateKbps);
+
+        _logger.LogInformation(
+            "AudioMixerService initialized — mixer inputs: music=attached, soundboard=attached, mic=detached, ReadFully=false");
+    }
+
+    public MusicTrackSource Music { get; }
+    IMusicTrackSource IAudioMixerService.Music => Music;
+
+    public SoundEffectSource Soundboard { get; }
+    ISoundEffectSource IAudioMixerService.Soundboard => Soundboard;
+
+    public MicrophoneSource Microphone { get; }
+    IMicrophoneSource IAudioMixerService.Microphone => Microphone;
+
+    public IReadOnlyList<PlaybackQueueItem> Queue
+    {
+        get
+        {
+            lock (_sync)
+                return _queue.ToList();
+        }
+    }
+
+    public PlaybackQueueItem? NowPlaying
+    {
+        get
+        {
+            lock (_sync)
+                return _nowPlaying;
+        }
+    }
+
+    public float MasterVolume
+    {
+        get => _masterVolume;
+        set
+        {
+            _masterVolume = Math.Clamp(value, 0f, 1f);
+            _pipeline.SetMasterVolume(AudioValues.FactorToHumanVolume(_masterVolume));
+        }
+    }
+
+    public int EncoderBitrateKbps
+    {
+        get => _encoderBitrateKbps;
+        set
+        {
+            var normalized = OpusBitratePresets.Normalize(value);
+            if (_encoderBitrateKbps == normalized)
+                return;
+
+            _encoderBitrateKbps = normalized;
+            _pipeline.SetEncoderBitrate(_encoderBitrateKbps);
+            _logger.LogInformation("Opus encoder bitrate changed to {BitrateKbps} kbps ({BitrateBps} bps)",
+                _encoderBitrateKbps, _encoderBitrateKbps * 1000);
+            EncoderBitrateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public event EventHandler? QueueChanged;
+    public event EventHandler? NowPlayingChanged;
+    public event EventHandler? EncoderBitrateChanged;
+
+    public void Enqueue(string filePath)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Audio file not found.", filePath);
+
+        if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
+        {
+            throw new NotSupportedException(
+                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF.");
+        }
+
+        lock (_sync)
+        {
+            _queue.Add(new PlaybackQueueItem
+            {
+                FilePath = filePath,
+                DisplayName = Path.GetFileName(filePath),
+                Status = PlaybackQueueStatus.Queued
+            });
+
+            _logger.LogInformation(
+                "Queue enqueue: {FilePath} (queue size={QueueSize}, queued={QueuedCount})",
+                filePath, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
+        }
+
+        RaiseQueueChanged();
+    }
+
+    public void RemoveFromQueue(int index)
+    {
+        lock (_sync)
+        {
+            if (index < 0 || index >= _queue.Count)
+                return;
+
+            var item = _queue[index];
+            if (item.Status == PlaybackQueueStatus.Playing)
+                return;
+
+            _queue.RemoveAt(index);
+            _logger.LogInformation("Queue remove index {Index}: {FilePath}", index, item.FilePath);
+        }
+
+        RaiseQueueChanged();
+    }
+
+    public void ClearQueue()
+    {
+        lock (_sync)
+        {
+            var removed = _queue.RemoveAll(item => item.Status != PlaybackQueueStatus.Playing);
+            _logger.LogInformation("Queue cleared ({Removed} items removed)", removed);
+        }
+
+        RaiseQueueChanged();
+    }
+
+    public void Start()
+    {
+        lock (_sync)
+        {
+            if (Music.IsPlaying)
+            {
+                if (_isPaused || !_pipeline.IsTransmitting)
+                {
+                    _logger.LogInformation(
+                        "Resuming voice transmission (paused={Paused}, transmitting={Transmitting})",
+                        _isPaused, _pipeline.IsTransmitting);
+                    BeginTransmissionLocked();
+                }
+
+                return;
+            }
+
+            if (!TryStartNextQueuedTrackLocked())
+            {
+                _logger.LogWarning("Start requested but no queued tracks available");
+                return;
+            }
+
+            BeginTransmissionLocked();
+        }
+
+        if (Music.IsPlaying)
+            _pipeline.ResyncForNewTrack();
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+    }
+
+    public void Pause()
+    {
+        lock (_sync)
+        {
+            if (!Music.IsPlaying && !_isPaused)
+                return;
+
+            StopTransmissionLocked("paused");
+            _isPaused = true;
+        }
+    }
+
+    public void Stop()
+    {
+        lock (_sync)
+        {
+            StopTransmissionLocked("stopped");
+
+            if (_nowPlaying is not null)
+            {
+                // A track stuck at EOF still reports IsPlaying; don't re-queue it ahead of later tracks.
+                if (Music.IsStalled(StalledReadThreshold) || !Music.IsPlaying)
+                    _nowPlaying.Status = PlaybackQueueStatus.Played;
+                else
+                    _nowPlaying.Status = PlaybackQueueStatus.Queued;
+
+                _nowPlaying = null;
+            }
+
+            Music.Stop();
+            _isPaused = false;
+        }
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+    }
+
+    private void HandleTrackFinishedLocked()
+    {
+        PlaybackQueueItem? finished = _nowPlaying;
+
+        if (finished is not null)
+        {
+            finished.Status = PlaybackQueueStatus.Played;
+            _logger.LogInformation("Track finished: {FilePath}", finished.FilePath);
+        }
+
+        var queuedCount = _queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
+        foreach (var item in _queue)
+        {
+            _logger.LogInformation("  Queue item: {Name} [{Status}]", item.DisplayName, item.Status);
+        }
+
+        _logger.LogInformation(
+            "Queue state after EOF: queued={QueuedCount}, played={PlayedCount}, total={Total}",
+            queuedCount,
+            _queue.Count(i => i.Status == PlaybackQueueStatus.Played),
+            _queue.Count);
+
+        if (queuedCount > 0)
+        {
+            _logger.LogInformation("Queue advancing to next track ({QueuedCount} remaining in queue)", queuedCount);
+
+            if (!TryStartNextQueuedTrackLocked())
+            {
+                _logger.LogError("Queue advance failed despite {QueuedCount} queued items — entering idle", queuedCount);
+                _nowPlaying = null;
+                EnterIdleLocked("queue advance failed");
+            }
+            else
+            {
+                _pipeline.ResyncForNewTrack();
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked();
+            }
+        }
+        else
+        {
+            _nowPlaying = null;
+            EnterIdleLocked("queue finished");
+        }
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+
+        Music.NotifyTrackEndedEvent();
+    }
+
+    private bool TryStartNextQueuedTrackLocked()
+    {
+        var skipped = 0;
+
+        while (skipped < _queue.Count)
+        {
+            var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+            if (next is null)
+            {
+                _logger.LogWarning("TryStartNextQueuedTrack: no item with Queued status");
+                return false;
+            }
+
+            foreach (var item in _queue)
+            {
+                if (item.Status == PlaybackQueueStatus.Playing)
+                    item.Status = PlaybackQueueStatus.Queued;
+            }
+
+            next.Status = PlaybackQueueStatus.Playing;
+            _nowPlaying = next;
+
+            try
+            {
+                Music.Open(next.FilePath);
+                Music.Play();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to open/play queued track: {FilePath}", next.FilePath);
+                next.Status = PlaybackQueueStatus.Failed;
+                _nowPlaying = null;
+                skipped++;
+                continue;
+            }
+
+            _logger.LogInformation(
+                "Now playing: {FilePath} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
+                next.FilePath, Music.IsPlaying, _pipeline.IsTransmitting);
+            return true;
+        }
+
+        _logger.LogWarning("TryStartNextQueuedTrack: all queued tracks failed to open");
+        return false;
+    }
+
+    private void BeginTransmissionLocked()
+    {
+        _pipeline.ResetTimer();
+        _pipeline.Start();
+        _isPaused = false;
+        _logger.LogInformation(
+            "Voice transmission started (music.IsPlaying={IsPlaying}, soundboard.active={SoundboardActive})",
+            Music.IsPlaying, Soundboard.IsActive);
+    }
+
+    private void StopTransmissionLocked(string reason)
+    {
+        _pipeline.Pause();
+        _teamSpeak.VoiceTarget.LogTransmissionStopped(reason);
+        _logger.LogInformation(
+            "Voice transmission stopped ({Reason}) — pipeline paused, PreciseTimedPipe will stop requesting frames",
+            reason);
+    }
+
+    private void EnterIdleLocked(string reason)
+    {
+        StopTransmissionLocked(reason);
+        _isPaused = false;
+        _logger.LogInformation(
+            "Mixer idle ({Reason}) — music.IsPlaying={IsPlaying}, soundboard.active={SoundboardActive}, nowPlaying={NowPlaying}",
+            reason, Music.IsPlaying, Soundboard.IsActive, _nowPlaying?.DisplayName ?? "none");
+    }
+
+    private bool HasActiveAudioLocked() =>
+        Music.IsPlaying || Soundboard.IsActive;
+
+    private void ProcessLifecycleLocked()
+    {
+        if (Music.TryConsumeTrackEnd(out var finishedPath))
+        {
+            _logger.LogInformation("ProcessLifecycle: EOF consumed for {FilePath}", finishedPath);
+            HandleTrackFinishedLocked();
+            return;
+        }
+
+        if (Music.IsStalled(StalledReadThreshold))
+        {
+            _logger.LogWarning(
+                "ProcessLifecycle: stalled reads while playing {FilePath} — forcing track end",
+                Music.CurrentFilePath);
+            Music.ForceTrackEnd();
+            return;
+        }
+
+        if (!HasActiveAudioLocked() && _pipeline.IsTransmitting)
+        {
+            _logger.LogInformation("ProcessLifecycle: no active sources while pipeline still transmitting — forcing idle");
+            EnterIdleLocked("no active sources during read");
+        }
+    }
+
+    private void RaiseQueueChanged() => QueueChanged?.Invoke(this, EventArgs.Empty);
+
+    private void RaiseNowPlayingChanged() => NowPlayingChanged?.Invoke(this, EventArgs.Empty);
+
+    public void Dispose()
+    {
+        Stop();
+        Music.Dispose();
+        Soundboard.Dispose();
+        Microphone.Dispose();
+        _pipeline.Dispose();
+        _outputProducer.Dispose();
+    }
+}

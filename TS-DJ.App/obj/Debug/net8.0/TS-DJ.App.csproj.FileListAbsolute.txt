@@ -166,3 +166,4 @@
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/obj/Debug/net8.0/ref/TS-DJ.App.dll
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/NLayer.dll
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/NLayer.NAudioSupport.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/obj/Debug/net8.0/TS-DJ.App.sourcelink.json

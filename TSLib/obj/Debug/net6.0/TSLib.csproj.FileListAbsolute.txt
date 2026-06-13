@@ -23,3 +23,4 @@
 /media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net6.0/refint/TSLib.dll
 /media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net6.0/TSLib.pdb
 /media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net6.0/ref/TSLib.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net6.0/TSLib.sourcelink.json
