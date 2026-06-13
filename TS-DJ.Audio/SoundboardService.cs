@@ -93,7 +93,7 @@ public sealed class SoundboardService : ISoundboardService
         if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
         {
             throw new NotSupportedException(
-                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF.");
+                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF, FLAC.");
         }
 
         string? previousPath;

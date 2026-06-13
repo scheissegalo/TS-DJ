@@ -2,6 +2,18 @@
   "version": 3,
   "targets": {
     "net8.0": {
+      "BunLabs.NAudio.Flac/2.0.1": {
+        "type": "package",
+        "dependencies": {
+          "NAudio.Core": "2.0.0"
+        },
+        "compile": {
+          "lib/netstandard2.0/NAudio.Flac.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard2.0/NAudio.Flac.dll": {}
+        }
+      },
       "Heijden.Dns.Portable/2.0.19": {
         "type": "package",
         "dependencies": {
@@ -1739,6 +1751,18 @@
     }
   },
   "libraries": {
+    "BunLabs.NAudio.Flac/2.0.1": {
+      "sha512": "UTUYeIlVl5FmTyATW01MuUilF3nIwdqGOslVXOW/O0My86wSYbzPs2M3hEWurGaxw1mHeTs9M/kavpjInywF0g==",
+      "type": "package",
+      "path": "bunlabs.naudio.flac/2.0.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "bunlabs.naudio.flac.2.0.1.nupkg.sha512",
+        "bunlabs.naudio.flac.nuspec",
+        "lib/netstandard2.0/NAudio.Flac.dll"
+      ]
+    },
     "Heijden.Dns.Portable/2.0.19": {
       "sha512": "i540bJyh6vIypQP1ZKLES3KETxRBK0tPXRiNS8/0diy5za4GF2x9odXzLEslolldxdLVCZsM33YjC4/O2EOnhw==",
       "type": "package",
@@ -5714,6 +5738,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "BunLabs.NAudio.Flac >= 2.0.1",
       "Microsoft.Extensions.Logging.Abstractions >= 8.0.2",
       "NAudio >= 2.2.1",
       "NLayer >= 1.15.0",
@@ -5776,6 +5801,10 @@
       "net8.0": {
         "targetAlias": "net8.0",
         "dependencies": {
+          "BunLabs.NAudio.Flac": {
+            "target": "Package",
+            "version": "[2.0.1, )"
+          },
           "Microsoft.Extensions.Logging.Abstractions": {
             "target": "Package",
             "version": "[8.0.2, )"

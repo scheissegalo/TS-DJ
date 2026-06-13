@@ -1,3 +1,4 @@
+using NAudio.Flac;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using NLayer.NAudioSupport;
@@ -29,7 +30,7 @@ public sealed class AudioFileDecoder : IDisposable
     public static bool IsSupportedFile(string filePath)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
-        return ext is ".mp3" or ".wav" or ".aiff" or ".aif";
+        return ext is ".mp3" or ".wav" or ".aiff" or ".aif" or ".flac";
     }
 
     public void Open(string filePath)
@@ -49,8 +50,9 @@ public sealed class AudioFileDecoder : IDisposable
             ".mp3" => CreateMp3Reader(filePath),
             ".wav" => new WaveFileReader(filePath),
             ".aiff" or ".aif" => new AiffFileReader(filePath),
+            ".flac" => new FlacReader(filePath),
             _ => throw new NotSupportedException(
-                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Use MP3, WAV, or AIFF.")
+                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Use MP3, WAV, AIFF, or FLAC.")
         };
     }
 

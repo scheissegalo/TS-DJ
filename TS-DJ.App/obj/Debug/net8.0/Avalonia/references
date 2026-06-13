@@ -66,6 +66,7 @@
 /home/berni/.nuget/packages/naudio.asio/2.2.1/lib/netstandard2.0/NAudio.Asio.dll
 /home/berni/.nuget/packages/naudio.core/2.2.1/lib/netstandard2.0/NAudio.Core.dll
 /home/berni/.nuget/packages/naudio/2.2.1/lib/net6.0/NAudio.dll
+/home/berni/.nuget/packages/bunlabs.naudio.flac/2.0.1/lib/netstandard2.0/NAudio.Flac.dll
 /home/berni/.nuget/packages/naudio.midi/2.2.1/lib/netstandard2.0/NAudio.Midi.dll
 /home/berni/.nuget/packages/naudio.wasapi/2.2.1/lib/netstandard2.0/NAudio.Wasapi.dll
 /home/berni/.nuget/packages/naudio.winmm/2.2.1/lib/netstandard2.0/NAudio.WinMM.dll

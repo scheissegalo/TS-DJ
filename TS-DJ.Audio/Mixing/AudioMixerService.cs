@@ -140,7 +140,7 @@ public sealed class AudioMixerService : IAudioMixerService
         if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
         {
             throw new NotSupportedException(
-                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF.");
+                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF, FLAC.");
         }
 
         lock (_sync)
@@ -174,7 +174,7 @@ public sealed class AudioMixerService : IAudioMixerService
         if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
         {
             throw new NotSupportedException(
-                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF.");
+                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF, FLAC.");
         }
 
         lock (_sync)

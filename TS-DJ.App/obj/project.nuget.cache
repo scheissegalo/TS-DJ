@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "t0QL23XMzEY=",
+  "dgSpecHash": "5FEYMNGy2zw=",
   "success": true,
   "projectFilePath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
   "expectedPackageFiles": [
@@ -19,6 +19,7 @@
     "/home/berni/.nuget/packages/avalonia.win32/12.0.4/avalonia.win32.12.0.4.nupkg.sha512",
     "/home/berni/.nuget/packages/avalonia.x11/12.0.4/avalonia.x11.12.0.4.nupkg.sha512",
     "/home/berni/.nuget/packages/avaloniaui.diagnosticssupport/2.2.1/avaloniaui.diagnosticssupport.2.2.1.nupkg.sha512",
+    "/home/berni/.nuget/packages/bunlabs.naudio.flac/2.0.1/bunlabs.naudio.flac.2.0.1.nupkg.sha512",
     "/home/berni/.nuget/packages/communitytoolkit.mvvm/8.4.1/communitytoolkit.mvvm.8.4.1.nupkg.sha512",
     "/home/berni/.nuget/packages/harfbuzzsharp/8.3.1.3/harfbuzzsharp.8.3.1.3.nupkg.sha512",
     "/home/berni/.nuget/packages/harfbuzzsharp.nativeassets.linux/8.3.1.3/harfbuzzsharp.nativeassets.linux.8.3.1.3.nupkg.sha512",

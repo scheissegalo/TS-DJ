@@ -39,3 +39,4 @@
 /media/berni/FatExt2TB/clones/TS-DJ/tools/DecodeSequenceTest/obj/Debug/net8.0/DecodeSequenceTest.pdb
 /media/berni/FatExt2TB/clones/TS-DJ/tools/DecodeSequenceTest/obj/Debug/net8.0/DecodeSequenceTest.genruntimeconfig.cache
 /media/berni/FatExt2TB/clones/TS-DJ/tools/DecodeSequenceTest/obj/Debug/net8.0/ref/DecodeSequenceTest.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/DecodeSequenceTest/bin/Debug/net8.0/NAudio.Flac.dll

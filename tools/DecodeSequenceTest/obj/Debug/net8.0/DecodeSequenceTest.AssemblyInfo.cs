@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DecodeSequenceTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f9d9d18ebae56224e750d6de24844d9fa4e5cb77")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+13e8fcda8952e4f3385134dec2a1e6ecfcf7d1b3")]
 [assembly: System.Reflection.AssemblyProductAttribute("DecodeSequenceTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DecodeSequenceTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

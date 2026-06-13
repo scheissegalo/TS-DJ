@@ -238,7 +238,7 @@ public partial class SoundboardViewModel : ViewModelBase, IDisposable
             AllowMultiple = false,
             FileTypeFilter =
             [
-                new FilePickerFileType("Audio") { Patterns = ["*.mp3", "*.wav", "*.aiff", "*.aif"] }
+                new FilePickerFileType("Audio") { Patterns = ["*.mp3", "*.wav", "*.aiff", "*.aif", "*.flac"] }
             ]
         });
 

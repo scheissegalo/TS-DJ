@@ -256,6 +256,17 @@
           }
         }
       },
+      "BunLabs.NAudio.Flac/2.0.1": {
+        "dependencies": {
+          "NAudio.Core": "2.2.1"
+        },
+        "runtime": {
+          "lib/netstandard2.0/NAudio.Flac.dll": {
+            "assemblyVersion": "2.0.1.0",
+            "fileVersion": "2.0.1.0"
+          }
+        }
+      },
       "CommunityToolkit.Mvvm/8.4.1": {
         "runtime": {
           "lib/net8.0/CommunityToolkit.Mvvm.dll": {
@@ -1215,6 +1226,7 @@
       },
       "TS-DJ.Audio/1.0.0": {
         "dependencies": {
+          "BunLabs.NAudio.Flac": "2.0.1",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
           "NAudio": "2.2.1",
           "NLayer": "1.15.0",
@@ -1379,6 +1391,13 @@
       "sha512": "sha512-PXviRj+8t6IT7JdnVhs1EET+VgGB/K1Ju3yL/Q9sXR2YD9NzkIYybyfJG3DPXcTYXpEJZJvxGiCTjH1N8AkLhQ==",
       "path": "avaloniaui.diagnosticssupport/2.2.1",
       "hashPath": "avaloniaui.diagnosticssupport.2.2.1.nupkg.sha512"
+    },
+    "BunLabs.NAudio.Flac/2.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-UTUYeIlVl5FmTyATW01MuUilF3nIwdqGOslVXOW/O0My86wSYbzPs2M3hEWurGaxw1mHeTs9M/kavpjInywF0g==",
+      "path": "bunlabs.naudio.flac/2.0.1",
+      "hashPath": "bunlabs.naudio.flac.2.0.1.nupkg.sha512"
     },
     "CommunityToolkit.Mvvm/8.4.1": {
       "type": "package",

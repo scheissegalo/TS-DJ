@@ -279,7 +279,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             AllowMultiple = false,
             FileTypeFilter =
             [
-                new FilePickerFileType("Audio") { Patterns = ["*.mp3", "*.wav", "*.aiff", "*.aif"] }
+                new FilePickerFileType("Audio") { Patterns = ["*.mp3", "*.wav", "*.aiff", "*.aif", "*.flac"] }
             ]
         });
 
