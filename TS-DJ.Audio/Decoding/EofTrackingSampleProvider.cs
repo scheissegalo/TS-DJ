@@ -34,6 +34,18 @@ internal sealed class EofTrackingSampleProvider : ISampleProvider
 
     public WaveFormat WaveFormat { get; }
 
+    public TimeSpan CurrentTime
+    {
+        get
+        {
+            if (WaveFormat.Channels <= 0 || WaveFormat.SampleRate <= 0)
+                return TimeSpan.Zero;
+
+            var samplesPerSecond = (double)WaveFormat.SampleRate * WaveFormat.Channels;
+            return TimeSpan.FromSeconds(_deliveredSamples / samplesPerSecond);
+        }
+    }
+
     public bool ConsumeEofPending()
     {
         if (!_eofPending)

@@ -19,6 +19,10 @@ public interface IAudioMixerService : IDisposable
     void Enqueue(string filePath);
     void RemoveFromQueue(int index);
     void ClearQueue();
+    void PlayQueueItem(int index);
+    void SkipNext();
+    void SkipPrevious();
+    bool CanSkipPrevious { get; }
 
     void Start();
     void Pause();

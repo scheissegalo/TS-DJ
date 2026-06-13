@@ -97,5 +97,6 @@ public sealed class AudioPipeline : IDisposable
     {
         ClearSource();
         TimePipe.Dispose();
+        EncoderPipe.Dispose();
     }
 }

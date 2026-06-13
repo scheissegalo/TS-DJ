@@ -6,6 +6,8 @@ public interface IAudioPlaybackService
 {
     PlaybackState State { get; }
     string? CurrentFilePath { get; }
+    TimeSpan CurrentPosition { get; }
+    TimeSpan TotalDuration { get; }
     float Volume { get; set; }
 
     event EventHandler<PlaybackState>? StateChanged;
@@ -14,4 +16,8 @@ public interface IAudioPlaybackService
     Task PlayAsync(CancellationToken cancellationToken = default);
     Task PauseAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
+    Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default);
+    Task SkipNextAsync(CancellationToken cancellationToken = default);
+    Task SkipPreviousAsync(CancellationToken cancellationToken = default);
+    void RemoveFromQueue(int index);
 }

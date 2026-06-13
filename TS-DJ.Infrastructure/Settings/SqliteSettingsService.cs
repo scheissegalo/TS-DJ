@@ -139,8 +139,16 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
                 ? TS_DJ.Core.Audio.OpusBitratePresets.Normalize(parsed)
                 : TS_DJ.Core.Audio.OpusBitratePresets.Default;
 
+            var masterRaw = await ReadSettingAsync(connection, AudioSettings.MasterVolumeKey, cancellationToken);
+            var musicRaw = await ReadSettingAsync(connection, AudioSettings.MusicVolumeKey, cancellationToken);
+
             _logger.LogDebug("Loaded audio settings from {DatabasePath}", _databasePath);
-            return new AudioSettings { OpusBitrateKbps = kbps };
+            return new AudioSettings
+            {
+                OpusBitrateKbps = kbps,
+                MasterVolumeHuman = ClampVolumeHuman(masterRaw, 50),
+                MusicVolumeHuman = ClampVolumeHuman(musicRaw, 50)
+            };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -166,6 +174,10 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
 
             var kbps = TS_DJ.Core.Audio.OpusBitratePresets.Normalize(settings.OpusBitrateKbps);
             await WriteSettingAsync(connection, transaction, AudioSettings.OpusBitrateKbpsKey, kbps.ToString(), cancellationToken);
+            await WriteSettingAsync(connection, transaction, AudioSettings.MasterVolumeKey,
+                ClampVolumeHuman(settings.MasterVolumeHuman, 50).ToString(), cancellationToken);
+            await WriteSettingAsync(connection, transaction, AudioSettings.MusicVolumeKey,
+                ClampVolumeHuman(settings.MusicVolumeHuman, 50).ToString(), cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             _logger.LogDebug("Saved audio settings to {DatabasePath}", _databasePath);
@@ -181,6 +193,94 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
             _lock.Release();
         }
     }
+
+    public async Task<UiSettings> LoadUiSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+
+            var settings = new UiSettings
+            {
+                Width = ParseNullableDouble(await ReadSettingAsync(connection, UiSettings.WidthKey, cancellationToken)),
+                Height = ParseNullableDouble(await ReadSettingAsync(connection, UiSettings.HeightKey, cancellationToken)),
+                X = ParseNullableDouble(await ReadSettingAsync(connection, UiSettings.XKey, cancellationToken)),
+                Y = ParseNullableDouble(await ReadSettingAsync(connection, UiSettings.YKey, cancellationToken)),
+                WindowState = await ReadSettingAsync(connection, UiSettings.WindowStateKey, cancellationToken) ?? "Normal"
+            };
+
+            _logger.LogDebug("Loaded UI settings from {DatabasePath}", _databasePath);
+            return settings;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load UI settings from {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not load UI settings from '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SaveUiSettingsAsync(UiSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+            await WriteSettingAsync(connection, transaction, UiSettings.WidthKey,
+                settings.Width?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, cancellationToken);
+            await WriteSettingAsync(connection, transaction, UiSettings.HeightKey,
+                settings.Height?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, cancellationToken);
+            await WriteSettingAsync(connection, transaction, UiSettings.XKey,
+                settings.X?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, cancellationToken);
+            await WriteSettingAsync(connection, transaction, UiSettings.YKey,
+                settings.Y?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, cancellationToken);
+            await WriteSettingAsync(connection, transaction, UiSettings.WindowStateKey, settings.WindowState, cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Saved UI settings to {DatabasePath}", _databasePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save UI settings to {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not save UI settings to '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    private static int ClampVolumeHuman(string? raw, int defaultValue)
+    {
+        if (!int.TryParse(raw, out var value))
+            return defaultValue;
+
+        return Math.Clamp(value, 0, 100);
+    }
+
+    private static int ClampVolumeHuman(int value, int defaultValue)
+    {
+        if (value is < 0 or > 100)
+            return defaultValue;
+
+        return value;
+    }
+
+    private static double? ParseNullableDouble(string? raw) =>
+        double.TryParse(raw, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
 
     public async Task<string?> GetSettingAsync(string key, CancellationToken cancellationToken = default)
     {

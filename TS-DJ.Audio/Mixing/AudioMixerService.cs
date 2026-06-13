@@ -19,6 +19,7 @@ public sealed class AudioMixerService : IAudioMixerService
     private readonly MixingSampleProvider _mixer;
     private readonly MixerOutputProducer _outputProducer;
     private readonly List<PlaybackQueueItem> _queue = [];
+    private readonly Stack<string> _playHistory = [];
     private float _masterVolume = AudioValues.HumanVolumeToFactor(50f);
     private int _encoderBitrateKbps = OpusBitratePresets.Default;
     private PlaybackQueueItem? _nowPlaying;
@@ -184,6 +185,202 @@ public sealed class AudioMixerService : IAudioMixerService
         RaiseQueueChanged();
     }
 
+    public bool CanSkipPrevious
+    {
+        get
+        {
+            lock (_sync)
+                return _nowPlaying is not null || _playHistory.Count > 0;
+        }
+    }
+
+    public void PlayQueueItem(int index)
+    {
+        bool started;
+        lock (_sync)
+        {
+            if (index < 0 || index >= _queue.Count)
+                return;
+
+            var target = _queue[index];
+            if (target.Status == PlaybackQueueStatus.Playing)
+                return;
+
+            PushCurrentToHistoryLocked();
+            DemoteCurrentPlayingLocked();
+
+            target.Status = PlaybackQueueStatus.Playing;
+            _nowPlaying = target;
+
+            try
+            {
+                Music.Open(target.FilePath);
+                Music.Play();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to play queue item at index {Index}: {FilePath}", index, target.FilePath);
+                target.Status = PlaybackQueueStatus.Failed;
+                _nowPlaying = null;
+                RaiseQueueChanged();
+                return;
+            }
+
+            if (!_pipeline.IsTransmitting)
+                BeginTransmissionLocked();
+            else
+                _pipeline.ResyncForNewTrack();
+
+            started = true;
+            _logger.LogInformation("PlayQueueItem index {Index}: {FilePath}", index, target.FilePath);
+        }
+
+        if (started)
+        {
+            RaiseNowPlayingChanged();
+            RaiseQueueChanged();
+        }
+    }
+
+    public void SkipNext()
+    {
+        bool advanced;
+        lock (_sync)
+        {
+            PushCurrentToHistoryLocked();
+
+            if (_nowPlaying is not null)
+            {
+                _nowPlaying.Status = PlaybackQueueStatus.Played;
+                _nowPlaying = null;
+            }
+
+            if (!TryStartNextQueuedTrackLocked())
+            {
+                EnterIdleLocked("skip next — queue empty");
+                advanced = false;
+            }
+            else
+            {
+                _pipeline.ResyncForNewTrack();
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked();
+                advanced = true;
+            }
+
+            _logger.LogInformation("SkipNext — advanced={Advanced}", advanced);
+        }
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+    }
+
+    public void SkipPrevious()
+    {
+        var changed = false;
+        lock (_sync)
+        {
+            if (_nowPlaying is null && _playHistory.Count == 0)
+            {
+                _logger.LogDebug("SkipPrevious — nothing to go back to");
+                return;
+            }
+
+            if (_nowPlaying is not null && Music.CurrentTime > TimeSpan.FromSeconds(3))
+            {
+                var path = _nowPlaying.FilePath;
+                try
+                {
+                    Music.Open(path);
+                    Music.Play();
+                    _pipeline.ResyncForNewTrack();
+                    if (!_pipeline.IsTransmitting)
+                        BeginTransmissionLocked();
+                    changed = true;
+                    _logger.LogInformation("SkipPrevious — restarted current track: {FilePath}", path);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "SkipPrevious — failed to restart {FilePath}", path);
+                }
+            }
+            else if (_playHistory.Count > 0)
+            {
+                var previousPath = _playHistory.Pop();
+                var index = EnsureQueuedItemLocked(previousPath);
+                PushCurrentToHistoryLocked();
+                DemoteCurrentPlayingLocked();
+
+                var target = _queue[index];
+                target.Status = PlaybackQueueStatus.Playing;
+                _nowPlaying = target;
+
+                try
+                {
+                    Music.Open(target.FilePath);
+                    Music.Play();
+                    if (!_pipeline.IsTransmitting)
+                        BeginTransmissionLocked();
+                    else
+                        _pipeline.ResyncForNewTrack();
+                    changed = true;
+                    _logger.LogInformation("SkipPrevious — playing history item: {FilePath}", previousPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "SkipPrevious — failed to play history item: {FilePath}", previousPath);
+                    target.Status = PlaybackQueueStatus.Failed;
+                    _nowPlaying = null;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            RaiseNowPlayingChanged();
+            RaiseQueueChanged();
+        }
+    }
+
+    private void PushCurrentToHistoryLocked()
+    {
+        if (_nowPlaying is null)
+            return;
+
+        if (_playHistory.Count == 0 || _playHistory.Peek() != _nowPlaying.FilePath)
+            _playHistory.Push(_nowPlaying.FilePath);
+    }
+
+    private void DemoteCurrentPlayingLocked()
+    {
+        foreach (var item in _queue)
+        {
+            if (item.Status == PlaybackQueueStatus.Playing)
+                item.Status = PlaybackQueueStatus.Queued;
+        }
+    }
+
+    private int EnsureQueuedItemLocked(string filePath)
+    {
+        for (var i = 0; i < _queue.Count; i++)
+        {
+            if (_queue[i].FilePath == filePath)
+            {
+                if (_queue[i].Status != PlaybackQueueStatus.Playing)
+                    _queue[i].Status = PlaybackQueueStatus.Queued;
+                return i;
+            }
+        }
+
+        _queue.Insert(0, new PlaybackQueueItem
+        {
+            FilePath = filePath,
+            DisplayName = Path.GetFileName(filePath),
+            Status = PlaybackQueueStatus.Queued
+        });
+        return 0;
+    }
+
     public void Start()
     {
         lock (_sync)
@@ -248,6 +445,7 @@ public sealed class AudioMixerService : IAudioMixerService
 
             Music.Stop();
             _isPaused = false;
+            _playHistory.Clear();
         }
 
         RaiseNowPlayingChanged();
@@ -261,6 +459,8 @@ public sealed class AudioMixerService : IAudioMixerService
         if (finished is not null)
         {
             finished.Status = PlaybackQueueStatus.Played;
+            if (_playHistory.Count == 0 || _playHistory.Peek() != finished.FilePath)
+                _playHistory.Push(finished.FilePath);
             _logger.LogInformation("Track finished: {FilePath}", finished.FilePath);
         }
 

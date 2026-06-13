@@ -14,17 +14,20 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
     private readonly ILogger<AudioPlaybackService> _logger;
     private readonly IAudioMixerService _mixer;
     private readonly TeamSpeakService _teamSpeak;
+    private readonly TeamSpeakNicknameService _nicknameService;
     private PlaybackState _state = PlaybackState.Stopped;
     private float _volume = AudioValues.HumanVolumeToFactor(50f);
 
     public AudioPlaybackService(
         ILogger<AudioPlaybackService> logger,
         IAudioMixerService mixer,
-        TeamSpeakService teamSpeak)
+        TeamSpeakService teamSpeak,
+        TeamSpeakNicknameService nicknameService)
     {
         _logger = logger;
         _mixer = mixer;
         _teamSpeak = teamSpeak;
+        _nicknameService = nicknameService;
 
         _mixer.Music.Volume = _volume;
         _mixer.NowPlayingChanged += OnNowPlayingChanged;
@@ -34,6 +37,8 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
     public PlaybackState State => _state;
     public string? CurrentFilePath => _mixer.NowPlaying?.FilePath;
+    public TimeSpan CurrentPosition => _mixer.Music.CurrentTime;
+    public TimeSpan TotalDuration => _mixer.Music.TotalTime;
 
     public float Volume
     {
@@ -55,8 +60,6 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
             "Enqueued via LoadAsync: {FilePath} (queue size={QueueSize})",
             filePath, _mixer.Queue.Count);
 
-        // Auto-start when connected and the mixer is idle (browse-to-play).
-        // If something is already playing, the new track stays Queued for auto-advance.
         if (!_teamSpeak.Client.Connected)
             return;
 
@@ -129,12 +132,60 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
-        // Mark stopped before mixer events fire — prevents auto-restart of queued tracks.
         SetState(PlaybackState.Stopped);
         _mixer.Stop();
         _logger.LogInformation("Playback stopped");
         return Task.CompletedTask;
     }
+
+    public Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default)
+    {
+        if (!_teamSpeak.Client.Connected)
+        {
+            _logger.LogWarning("Cannot play queue item — not connected to TeamSpeak");
+            return Task.CompletedTask;
+        }
+
+        _mixer.PlayQueueItem(index);
+
+        if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
+        {
+            SetState(PlaybackState.Playing);
+            _logger.LogInformation("PlayQueueItem started: {FilePath}", _mixer.NowPlaying.FilePath);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task SkipNextAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_teamSpeak.Client.Connected)
+            return Task.CompletedTask;
+
+        _mixer.SkipNext();
+
+        if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
+            SetState(PlaybackState.Playing);
+        else if (_state == PlaybackState.Playing)
+            SetState(PlaybackState.Stopped);
+
+        return Task.CompletedTask;
+    }
+
+    public Task SkipPreviousAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_teamSpeak.Client.Connected)
+            return Task.CompletedTask;
+
+        _mixer.SkipPrevious();
+
+        if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
+            SetState(PlaybackState.Playing);
+
+        return Task.CompletedTask;
+    }
+
+    public void RemoveFromQueue(int index) => _mixer.RemoveFromQueue(index);
 
     private void OnNowPlayingChanged(object? sender, EventArgs e)
     {
@@ -162,9 +213,6 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         TryContinueQueue("QueueChanged");
     }
 
-    /// <summary>
-    /// Keeps playback state aligned with the mixer — never mark Stopped while queued tracks remain.
-    /// </summary>
     private void SyncPlaybackState(string reason)
     {
         if (_state == PlaybackState.Paused)
@@ -182,7 +230,6 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
             return;
         }
 
-        // Session thinks it's playing but the mixer went idle — try to recover once.
         if (_state == PlaybackState.Playing && hasWaitingTrack && _teamSpeak.Client.Connected)
         {
             _logger.LogInformation(
@@ -212,10 +259,6 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         }
     }
 
-    /// <summary>
-    /// Safety net during an active session: if the mixer went idle while queued tracks remain, start the next track.
-    /// Never runs after the user explicitly stopped (state == Stopped).
-    /// </summary>
     private void TryContinueQueue(string reason)
     {
         if (_state != PlaybackState.Playing)
@@ -265,10 +308,12 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         _logger.LogDebug("Playback state transition: {OldState} → {NewState}", _state, state);
         _state = state;
         StateChanged?.Invoke(this, state);
+        _ = _nicknameService.UpdatePlaybackStatusAsync(state);
     }
 
     public void Dispose()
     {
+        _mixer.Stop();
         _mixer.NowPlayingChanged -= OnNowPlayingChanged;
         _mixer.QueueChanged -= OnQueueChanged;
         _teamSpeak.StateChanged -= OnTeamSpeakStateChanged;

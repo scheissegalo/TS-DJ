@@ -24,6 +24,8 @@ public sealed class AudioFileDecoder : IDisposable
 
     public TimeSpan TotalTime => _reader?.TotalTime ?? TimeSpan.Zero;
 
+    public TimeSpan CurrentTime => _output?.CurrentTime ?? TimeSpan.Zero;
+
     public static bool IsSupportedFile(string filePath)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();

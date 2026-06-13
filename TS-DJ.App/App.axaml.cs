@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using TS_DJ.App.Services;
 using TS_DJ.App.ViewModels;
 using TS_DJ.App.Views;
 using TS_DJ.Audio.DependencyInjection;
@@ -34,6 +35,7 @@ public partial class App : Application
                 services.AddTsDjTeamSpeak();
                 services.AddTsDjAudio();
                 services.AddSingleton<MainWindowViewModel>();
+                services.AddSingleton<ApplicationShutdownService>();
             })
             .ConfigureLogging(logging =>
             {
@@ -60,7 +62,13 @@ public partial class App : Application
                 DataContext = _host.Services.GetRequiredService<MainWindowViewModel>()
             };
 
-            desktop.Exit += (_, _) => _host.Dispose();
+            desktop.Exit += (_, _) =>
+            {
+                if (_host.Services.GetService<MainWindowViewModel>() is IDisposable disposable)
+                    disposable.Dispose();
+
+                _host.Dispose();
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

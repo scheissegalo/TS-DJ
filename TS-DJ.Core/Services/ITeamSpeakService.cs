@@ -11,4 +11,5 @@ public interface ITeamSpeakService
 
     Task ConnectAsync(ConnectionSettings settings, CancellationToken cancellationToken = default);
     Task DisconnectAsync(CancellationToken cancellationToken = default);
+    Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default);
 }

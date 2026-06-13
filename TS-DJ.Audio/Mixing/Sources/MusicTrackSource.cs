@@ -49,6 +49,24 @@ public sealed class MusicTrackSource : IMusicTrackSource
     public bool IsPlaying => _gated.IsPlaying;
     public string? CurrentFilePath => _currentFilePath;
 
+    public TimeSpan CurrentTime
+    {
+        get
+        {
+            lock (_sync)
+                return _decoder?.CurrentTime ?? TimeSpan.Zero;
+        }
+    }
+
+    public TimeSpan TotalTime
+    {
+        get
+        {
+            lock (_sync)
+                return _decoder?.TotalTime ?? TimeSpan.Zero;
+        }
+    }
+
     public float Volume
     {
         get => _volume;

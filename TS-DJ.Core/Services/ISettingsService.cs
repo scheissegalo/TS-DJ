@@ -10,6 +10,9 @@ public interface ISettingsService
     Task<AudioSettings> LoadAudioSettingsAsync(CancellationToken cancellationToken = default);
     Task SaveAudioSettingsAsync(AudioSettings settings, CancellationToken cancellationToken = default);
 
+    Task<UiSettings> LoadUiSettingsAsync(CancellationToken cancellationToken = default);
+    Task SaveUiSettingsAsync(UiSettings settings, CancellationToken cancellationToken = default);
+
     Task<string?> GetSettingAsync(string key, CancellationToken cancellationToken = default);
     Task SetSettingAsync(string key, string? value, CancellationToken cancellationToken = default);
 }

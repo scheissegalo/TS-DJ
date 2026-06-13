@@ -114,6 +114,21 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
         _logger.LogInformation("Disconnected");
     }
 
+    public async Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(nickname))
+            throw new ArgumentException("Nickname must not be empty.", nameof(nickname));
+
+        if (_state != ConnectionState.Connected)
+        {
+            _logger.LogDebug("SetNickname ignored — not connected");
+            return;
+        }
+
+        await _scheduler.InvokeAsync(() => _client.ChangeName(nickname));
+        _logger.LogDebug("Nickname changed to {Nickname}", nickname);
+    }
+
     private void OnClientDisconnected(object? sender, DisconnectEventArgs e)
     {
         if (e.Error != null)
@@ -203,6 +218,19 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
     public void Dispose()
     {
         _client.OnDisconnected -= OnClientDisconnected;
+
+        if (_state == ConnectionState.Connected && !_closed)
+        {
+            try
+            {
+                _scheduler.InvokeAsync(_client.Disconnect).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Best-effort disconnect during dispose failed");
+            }
+        }
+
         _client.Dispose();
         _scheduler.Dispose();
     }

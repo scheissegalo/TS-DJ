@@ -12,6 +12,8 @@ public interface IMusicTrackSource : IAudioSource
 {
     bool IsPlaying { get; }
     string? CurrentFilePath { get; }
+    TimeSpan CurrentTime { get; }
+    TimeSpan TotalTime { get; }
 
     void Open(string filePath);
     void Play();

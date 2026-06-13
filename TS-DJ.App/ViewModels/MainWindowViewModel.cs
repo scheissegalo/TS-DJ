@@ -9,10 +9,11 @@ using TS_DJ.Audio;
 using TS_DJ.Core.Audio;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
+using TS_DJ.TeamSpeak;
 
 namespace TS_DJ.App.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly ITeamSpeakService _teamSpeakService;
@@ -20,7 +21,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IAudioMixerService _audioMixerService;
     private readonly ISettingsService _settingsService;
     private readonly ILogService _logService;
+    private readonly TeamSpeakNicknameService _nicknameService;
+    private readonly DispatcherTimer _progressTimer;
+    private CancellationTokenSource? _volumeSaveDebounceCts;
     private bool _isLoadingSettings;
+    private bool _disposed;
 
     [ObservableProperty]
     private string _serverAddress = string.Empty;
@@ -53,6 +58,18 @@ public partial class MainWindowViewModel : ViewModelBase
     private double _masterVolume = 50;
 
     [ObservableProperty]
+    private double _progressValue;
+
+    [ObservableProperty]
+    private string _elapsedDisplay = "0:00";
+
+    [ObservableProperty]
+    private string _remainingDisplay = "-0:00";
+
+    [ObservableProperty]
+    private bool _hasActiveTrack;
+
+    [ObservableProperty]
     private bool _isConnected;
 
     [ObservableProperty]
@@ -73,12 +90,22 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _opusBitrateDisplay = OpusBitratePresets.Label(OpusBitratePresets.Default);
 
+    [ObservableProperty]
+    private PlaybackQueueItemViewModel? _selectedQueueItem;
+
     public bool CanConnect => !IsConnected && !IsConnecting;
     public bool CanDisconnect => IsConnected;
     public bool CanPlay => IsConnected && HasQueueItems && !IsPlaying && !IsPaused;
     public bool CanPause => IsPlaying;
     public bool CanStop => IsPlaying || IsPaused;
     public bool CanBrowse => IsConnected;
+    public bool CanSkipNext => IsConnected && (IsPlaying || IsPaused || HasQueuedItemsRemaining);
+    public bool CanSkipPrevious => IsConnected && (_audioMixerService.CanSkipPrevious || IsPlaying || IsPaused);
+    public bool CanRemoveQueueItem =>
+        SelectedQueueItem is not null && SelectedQueueItem.Status != PlaybackQueueStatus.Playing;
+
+    private bool HasQueuedItemsRemaining =>
+        _audioMixerService.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
 
     public ObservableCollection<LogEntry> LogEntries { get; } = [];
     public ObservableCollection<PlaybackQueueItemViewModel> QueueItems { get; } = [];
@@ -96,7 +123,8 @@ public partial class MainWindowViewModel : ViewModelBase
         IAudioPlaybackService audioPlaybackService,
         IAudioMixerService audioMixerService,
         ISettingsService settingsService,
-        ILogService logService)
+        ILogService logService,
+        TeamSpeakNicknameService nicknameService)
     {
         _logger = logger;
         _teamSpeakService = teamSpeakService;
@@ -104,6 +132,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _audioMixerService = audioMixerService;
         _settingsService = settingsService;
         _logService = logService;
+        _nicknameService = nicknameService;
 
         _teamSpeakService.StateChanged += OnConnectionStateChanged;
         _teamSpeakService.StatusMessage += OnStatusMessage;
@@ -113,16 +142,23 @@ public partial class MainWindowViewModel : ViewModelBase
         _audioMixerService.EncoderBitrateChanged += OnEncoderBitrateChanged;
         _logService.EntryAdded += OnLogEntryAdded;
 
+        _progressTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(250)
+        };
+        _progressTimer.Tick += (_, _) => UpdateProgressDisplay();
+
         foreach (var entry in _logService.Entries)
             LogEntries.Add(entry);
 
         RefreshQueue();
         UpdateNowPlayingDisplay();
+        ResetProgressDisplay();
 
         _ = LoadSettingsAsync();
     }
 
-    private async Task LoadSettingsAsync()
+    public async Task LoadSettingsAsync()
     {
         _isLoadingSettings = true;
         try
@@ -132,10 +168,13 @@ public partial class MainWindowViewModel : ViewModelBase
             Nickname = settings.Nickname;
             ServerPassword = settings.ServerPassword;
             Channel = settings.Channel;
-            Volume = AudioValues.FactorToHumanVolume(_audioPlaybackService.Volume);
-            MasterVolume = AudioValues.FactorToHumanVolume(_audioMixerService.MasterVolume);
 
             var audioSettings = await _settingsService.LoadAudioSettingsAsync();
+            Volume = audioSettings.MusicVolumeHuman;
+            MasterVolume = audioSettings.MasterVolumeHuman;
+            _audioPlaybackService.Volume = AudioValues.HumanVolumeToFactor((float)Volume);
+            _audioMixerService.MasterVolume = AudioValues.HumanVolumeToFactor((float)MasterVolume);
+
             _audioMixerService.EncoderBitrateKbps = audioSettings.OpusBitrateKbps;
             OpusBitrateDisplay = OpusBitratePresets.Label(_audioMixerService.EncoderBitrateKbps);
             SelectedOpusBitrate = OpusBitrateOptions.FirstOrDefault(option => option.Kbps == _audioMixerService.EncoderBitrateKbps)
@@ -148,6 +187,26 @@ public partial class MainWindowViewModel : ViewModelBase
         finally
         {
             _isLoadingSettings = false;
+        }
+    }
+
+    public async Task SaveSettingsForShutdownAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _settingsService.SaveConnectionSettingsAsync(new ConnectionSettings
+            {
+                Address = ServerAddress,
+                Nickname = Nickname,
+                ServerPassword = ServerPassword,
+                Channel = Channel
+            }, cancellationToken);
+
+            await SaveAudioSettingsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to save settings during shutdown", ex);
         }
     }
 
@@ -164,6 +223,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
+            _nicknameService.SetBaseNickname(Nickname);
             await _settingsService.SaveConnectionSettingsAsync(settings);
             await _teamSpeakService.ConnectAsync(settings);
         }
@@ -179,6 +239,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         try
         {
+            await _nicknameService.RestoreBaseNicknameAsync();
             await _teamSpeakService.DisconnectAsync();
         }
         catch (Exception ex)
@@ -237,14 +298,59 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private async Task StopAsync() => await _audioPlaybackService.StopAsync();
 
+    [RelayCommand]
+    private async Task SkipNextAsync()
+    {
+        await _audioPlaybackService.SkipNextAsync();
+        NotifyCommandStatesChanged();
+    }
+
+    [RelayCommand]
+    private async Task SkipPreviousAsync()
+    {
+        await _audioPlaybackService.SkipPreviousAsync();
+        NotifyCommandStatesChanged();
+    }
+
+    [RelayCommand]
+    private async Task PlaySelectedQueueItemAsync()
+    {
+        if (SelectedQueueItem is null)
+            return;
+
+        var index = QueueItems.IndexOf(SelectedQueueItem);
+        if (index < 0)
+            return;
+
+        await _audioPlaybackService.PlayQueueItemAsync(index);
+        NotifyCommandStatesChanged();
+    }
+
+    [RelayCommand]
+    private void RemoveSelectedQueueItem()
+    {
+        if (SelectedQueueItem is null)
+            return;
+
+        var index = QueueItems.IndexOf(SelectedQueueItem);
+        if (index < 0)
+            return;
+
+        _audioPlaybackService.RemoveFromQueue(index);
+        SelectedQueueItem = null;
+        NotifyCommandStatesChanged();
+    }
+
     partial void OnVolumeChanged(double value)
     {
         _audioPlaybackService.Volume = AudioValues.HumanVolumeToFactor((float)value);
+        ScheduleAudioSettingsSave();
     }
 
     partial void OnMasterVolumeChanged(double value)
     {
         _audioMixerService.MasterVolume = AudioValues.HumanVolumeToFactor((float)value);
+        ScheduleAudioSettingsSave();
     }
 
     partial void OnSelectedOpusBitrateChanged(OpusBitrateOption? value)
@@ -257,26 +363,64 @@ public partial class MainWindowViewModel : ViewModelBase
         _ = SaveAudioSettingsAsync();
     }
 
-    private async Task SaveAudioSettingsAsync()
+    partial void OnSelectedQueueItemChanged(PlaybackQueueItemViewModel? value) =>
+        NotifyCommandStatesChanged();
+
+    partial void OnIsConnectedChanged(bool value) => NotifyCommandStatesChanged();
+    partial void OnIsConnectingChanged(bool value) => NotifyCommandStatesChanged();
+    partial void OnIsPlayingChanged(bool value)
+    {
+        NotifyCommandStatesChanged();
+        UpdateProgressTimerState();
+    }
+
+    partial void OnIsPausedChanged(bool value)
+    {
+        NotifyCommandStatesChanged();
+        UpdateProgressTimerState();
+    }
+
+    partial void OnHasQueueItemsChanged(bool value) => NotifyCommandStatesChanged();
+
+    private void ScheduleAudioSettingsSave()
+    {
+        if (_isLoadingSettings)
+            return;
+
+        _volumeSaveDebounceCts?.Cancel();
+        _volumeSaveDebounceCts?.Dispose();
+        _volumeSaveDebounceCts = new CancellationTokenSource();
+        _ = DebouncedSaveAudioSettingsAsync(_volumeSaveDebounceCts.Token);
+    }
+
+    private async Task DebouncedSaveAudioSettingsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(300, cancellationToken);
+            await SaveAudioSettingsAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task SaveAudioSettingsAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             await _settingsService.SaveAudioSettingsAsync(new AudioSettings
             {
-                OpusBitrateKbps = _audioMixerService.EncoderBitrateKbps
-            });
+                OpusBitrateKbps = _audioMixerService.EncoderBitrateKbps,
+                MasterVolumeHuman = (int)Math.Round(MasterVolume),
+                MusicVolumeHuman = (int)Math.Round(Volume)
+            }, cancellationToken);
         }
         catch (Exception ex)
         {
             LogError("Failed to save audio settings", ex);
         }
     }
-
-    partial void OnIsConnectedChanged(bool value) => NotifyCommandStatesChanged();
-    partial void OnIsConnectingChanged(bool value) => NotifyCommandStatesChanged();
-    partial void OnIsPlayingChanged(bool value) => NotifyCommandStatesChanged();
-    partial void OnIsPausedChanged(bool value) => NotifyCommandStatesChanged();
-    partial void OnHasQueueItemsChanged(bool value) => NotifyCommandStatesChanged();
 
     private void OnConnectionStateChanged(object? sender, ConnectionState state)
     {
@@ -291,6 +435,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 ConnectionState.Error => "● Error",
                 _ => "● Disconnected"
             };
+
+            if (state == ConnectionState.Connected)
+            {
+                _nicknameService.SetBaseNickname(Nickname);
+                _ = _nicknameService.ApplyInitialStatusAsync();
+            }
+
+            NotifyCommandStatesChanged();
         });
     }
 
@@ -314,58 +466,37 @@ public partial class MainWindowViewModel : ViewModelBase
             IsPlaying = state == PlaybackState.Playing;
             IsPaused = state == PlaybackState.Paused;
             PlaybackStatus = state.ToString();
-            _logger.LogDebug("UI dispatcher: IsPlaying={IsPlaying}, PlaybackStatus={Status}", IsPlaying, PlaybackStatus);
+            UpdateProgressTimerState();
+            NotifyCommandStatesChanged();
         });
     }
 
     private void OnQueueChanged(object? sender, EventArgs e)
     {
-        _logger.LogInformation(
-            "UI: QueueChanged received (mixer total={Total})",
-            _audioMixerService.Queue.Count);
         Dispatcher.UIThread.Post(SyncPlaybackUiFromMixer);
     }
 
     private void OnNowPlayingChanged(object? sender, EventArgs e)
     {
-        _logger.LogInformation(
-            "UI: NowPlayingChanged received → {NowPlaying}",
-            _audioMixerService.NowPlaying?.DisplayName ?? "none");
-        Dispatcher.UIThread.Post(SyncPlaybackUiFromMixer);
+        Dispatcher.UIThread.Post(() =>
+        {
+            SyncPlaybackUiFromMixer();
+            ResetProgressDisplay();
+        });
     }
 
-    /// <summary>
-    /// Single UI sync point — reads queue and now-playing directly from the mixer (source of truth).
-    /// </summary>
     private void SyncPlaybackUiFromMixer()
     {
-        var queue = _audioMixerService.Queue;
-        var queued = queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
-        var playing = queue.Count(i => i.Status == PlaybackQueueStatus.Playing);
-        var played = queue.Count(i => i.Status == PlaybackQueueStatus.Played);
-
-        _logger.LogInformation(
-            "UI dispatcher sync: total={Total}, queued={Queued}, playing={Playing}, played={Played}, nowPlaying={NowPlaying}",
-            queue.Count, queued, playing, played,
-            _audioMixerService.NowPlaying?.DisplayName ?? "none");
-
         RefreshQueue();
         UpdateNowPlayingDisplay();
+        NotifyCommandStatesChanged();
     }
 
     private void RefreshQueue()
     {
         var queue = _audioMixerService.Queue;
-        var hadQueueItems = HasQueueItems;
         HasQueueItems = queue.Any(item =>
             item.Status is PlaybackQueueStatus.Queued or PlaybackQueueStatus.Playing);
-
-        if (hadQueueItems != HasQueueItems)
-        {
-            _logger.LogInformation(
-                "UI: HasQueueItems {Old} → {New} (queue count={Count})",
-                hadQueueItems, HasQueueItems, queue.Count);
-        }
 
         for (var i = 0; i < queue.Count; i++)
         {
@@ -376,25 +507,70 @@ public partial class MainWindowViewModel : ViewModelBase
             else
             {
                 QueueItems.Add(new PlaybackQueueItemViewModel(queue[i]));
-                _logger.LogDebug("UI: added queue row {Index}: {Name}", i, queue[i].DisplayName);
             }
         }
 
         while (QueueItems.Count > queue.Count)
-        {
-            _logger.LogDebug("UI: removed stale queue row at index {Index}", QueueItems.Count - 1);
             QueueItems.RemoveAt(QueueItems.Count - 1);
+
+        if (SelectedQueueItem is not null &&
+            !QueueItems.Contains(SelectedQueueItem))
+        {
+            SelectedQueueItem = null;
         }
     }
 
     private void UpdateNowPlayingDisplay()
     {
-        var display = _audioMixerService.NowPlaying?.DisplayName ?? "Nothing playing";
-        if (NowPlayingDisplay != display)
+        NowPlayingDisplay = _audioMixerService.NowPlaying?.DisplayName ?? "Nothing playing";
+        HasActiveTrack = _audioMixerService.NowPlaying is not null;
+    }
+
+    private void UpdateProgressTimerState()
+    {
+        if (IsPlaying)
+            _progressTimer.Start();
+        else
+            _progressTimer.Stop();
+    }
+
+    private void ResetProgressDisplay()
+    {
+        if (_audioMixerService.NowPlaying is null)
         {
-            _logger.LogInformation("UI: NowPlayingDisplay → {Display}", display);
-            NowPlayingDisplay = display;
+            ProgressValue = 0;
+            ElapsedDisplay = "0:00";
+            RemainingDisplay = "-0:00";
+            HasActiveTrack = false;
+            return;
         }
+
+        UpdateProgressDisplay();
+    }
+
+    private void UpdateProgressDisplay()
+    {
+        var elapsed = _audioPlaybackService.CurrentPosition;
+        var total = _audioPlaybackService.TotalDuration;
+
+        ElapsedDisplay = FormatPlaybackTime(elapsed);
+        RemainingDisplay = total > TimeSpan.Zero
+            ? $"-{FormatPlaybackTime(total - elapsed)}"
+            : "-0:00";
+
+        ProgressValue = total > TimeSpan.Zero
+            ? Math.Clamp(elapsed.TotalMilliseconds / total.TotalMilliseconds * 100.0, 0, 100)
+            : 0;
+    }
+
+    internal static string FormatPlaybackTime(TimeSpan time)
+    {
+        if (time < TimeSpan.Zero)
+            time = TimeSpan.Zero;
+
+        return time.TotalHours >= 1
+            ? $"{(int)time.TotalHours}:{time.Minutes:D2}:{time.Seconds:D2}"
+            : $"{time.Minutes}:{time.Seconds:D2}";
     }
 
     private void OnEncoderBitrateChanged(object? sender, EventArgs e)
@@ -416,6 +592,9 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanPause));
         OnPropertyChanged(nameof(CanStop));
         OnPropertyChanged(nameof(CanBrowse));
+        OnPropertyChanged(nameof(CanSkipNext));
+        OnPropertyChanged(nameof(CanSkipPrevious));
+        OnPropertyChanged(nameof(CanRemoveQueueItem));
     }
 
     private void LogError(string message, Exception ex)
@@ -430,5 +609,24 @@ public partial class MainWindowViewModel : ViewModelBase
             Level = "Error",
             Message = $"{message}: {detail}"
         });
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        _progressTimer.Stop();
+        _volumeSaveDebounceCts?.Cancel();
+        _volumeSaveDebounceCts?.Dispose();
+
+        _teamSpeakService.StateChanged -= OnConnectionStateChanged;
+        _teamSpeakService.StatusMessage -= OnStatusMessage;
+        _audioPlaybackService.StateChanged -= OnPlaybackStateChanged;
+        _audioMixerService.QueueChanged -= OnQueueChanged;
+        _audioMixerService.NowPlayingChanged -= OnNowPlayingChanged;
+        _audioMixerService.EncoderBitrateChanged -= OnEncoderBitrateChanged;
+        _logService.EntryAdded -= OnLogEntryAdded;
     }
 }

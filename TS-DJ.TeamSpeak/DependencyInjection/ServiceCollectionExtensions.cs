@@ -11,6 +11,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IdentityStore>();
         services.AddSingleton<ITeamSpeakService, TeamSpeakService>();
         services.AddSingleton<TeamSpeakService>(sp => (TeamSpeakService)sp.GetRequiredService<ITeamSpeakService>());
+        services.AddSingleton<TeamSpeakNicknameService>();
 
         return services;
     }
