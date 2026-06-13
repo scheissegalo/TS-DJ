@@ -7,15 +7,16 @@ using TS_DJ.Core.Audio;
 namespace TS_DJ.Audio.Decoding;
 
 /// <summary>
-/// Decodes local audio files to 48 kHz stereo IEEE float samples for the mixer.
+/// Decodes local audio files and remote HTTP streams to 48 kHz stereo IEEE float samples for the mixer.
 /// </summary>
 public sealed class AudioFileDecoder : IDisposable
 {
     private WaveStream? _reader;
     private EofTrackingSampleProvider? _output;
+    private TimeSpan? _knownDuration;
 
     public ISampleProvider Output =>
-        _output ?? throw new InvalidOperationException("No audio file is open.");
+        _output ?? throw new InvalidOperationException("No audio source is open.");
 
     public bool IsOpen => _output is not null;
 
@@ -23,7 +24,16 @@ public sealed class AudioFileDecoder : IDisposable
 
     internal void ForceEnd() => _output?.ForceEnd();
 
-    public TimeSpan TotalTime => _reader?.TotalTime ?? TimeSpan.Zero;
+    public TimeSpan TotalTime
+    {
+        get
+        {
+            if (_knownDuration is { } known && known > TimeSpan.Zero)
+                return known;
+
+            return _reader?.TotalTime ?? TimeSpan.Zero;
+        }
+    }
 
     public TimeSpan CurrentTime => _output?.CurrentTime ?? TimeSpan.Zero;
 
@@ -33,14 +43,41 @@ public sealed class AudioFileDecoder : IDisposable
         return ext is ".mp3" or ".wav" or ".aiff" or ".aif" or ".flac";
     }
 
+    public static bool IsRemoteUri(string source) =>
+        source.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+        || source.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
     public void Open(string filePath)
     {
         DisposeReader();
+        _knownDuration = null;
 
         _reader = CreateReader(filePath);
-        _output = CreateOutputProvider(_reader);
+        _output = CreateOutputProvider(_reader, null);
+    }
 
-        // Log at Information level via caller; keep decoder free of ILogger dependency.
+    public void OpenUri(string uri, TimeSpan? knownDuration = null)
+    {
+        if (!IsRemoteUri(uri))
+            throw new ArgumentException("Remote source must be an HTTP or HTTPS URL.", nameof(uri));
+
+        DisposeReader();
+        _knownDuration = knownDuration;
+
+        try
+        {
+            // MP3 decoder needs a seekable stream (ID3 tag handling). Buffer this track only.
+            var seekable = Task.Run(() => RemoteAudioHttp.DownloadAsSeekableStream(uri))
+                .GetAwaiter()
+                .GetResult();
+
+            _reader = CreateMp3Reader(seekable);
+            _output = CreateOutputProvider(_reader, knownDuration);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or TimeoutException or IOException)
+        {
+            throw new IOException("Failed to open remote audio stream.", ex);
+        }
     }
 
     private static WaveStream CreateReader(string filePath)
@@ -62,22 +99,30 @@ public sealed class AudioFileDecoder : IDisposable
         return new Mp3FileReaderBase(filePath, builder);
     }
 
-    private static EofTrackingSampleProvider CreateOutputProvider(WaveStream reader)
+    private static WaveStream CreateMp3Reader(Stream stream)
+    {
+        var builder = new Mp3FileReader.FrameDecompressorBuilder(wf => new Mp3FrameDecompressor(wf));
+        return new Mp3FileReaderBase(stream, builder);
+    }
+
+    private static EofTrackingSampleProvider CreateOutputProvider(WaveStream reader, TimeSpan? knownDuration)
     {
         ISampleProvider samples = reader.ToSampleProvider();
         if (samples.WaveFormat.Channels == 1)
             samples = new MonoToStereoSampleProvider(samples);
 
         var resampled = new WdlResamplingSampleProvider(samples, AudioFormat.SampleRate);
-        return new EofTrackingSampleProvider(reader, resampled);
+        return new EofTrackingSampleProvider(reader, resampled, knownDuration);
     }
 
     private void DisposeReader()
     {
         _output = null;
+        _knownDuration = null;
         _reader?.Dispose();
         _reader = null;
     }
 
     public void Dispose() => DisposeReader();
 }
+

@@ -15,11 +15,12 @@ public sealed class AudioMixerService : IAudioMixerService
     private readonly ILogger<AudioMixerService> _logger;
     private readonly AudioPipeline _pipeline;
     private readonly TeamSpeakService _teamSpeak;
+    private readonly IPlaybackStreamUrlProvider? _streamUrlProvider;
     private readonly object _sync = new();
     private readonly MixingSampleProvider _mixer;
     private readonly MixerOutputProducer _outputProducer;
     private readonly List<PlaybackQueueItem> _queue = [];
-    private readonly Stack<string> _playHistory = [];
+    private readonly Stack<PlaybackQueueItem> _playHistory = [];
     private float _masterVolume = AudioValues.HumanVolumeToFactor(50f);
     private int _encoderBitrateKbps = OpusBitratePresets.Default;
     private PlaybackQueueItem? _nowPlaying;
@@ -34,8 +35,10 @@ public sealed class AudioMixerService : IAudioMixerService
         ILogger<SoundEffectSource> soundboardLogger,
         ILogger<MixerOutputProducer> outputLogger,
         TeamSpeakService teamSpeak,
-        Id pipelineId)
+        Id pipelineId,
+        IPlaybackStreamUrlProvider? streamUrlProvider = null)
     {
+        _streamUrlProvider = streamUrlProvider;
         _logger = logger;
         _teamSpeak = teamSpeak;
 
@@ -166,32 +169,104 @@ public sealed class AudioMixerService : IAudioMixerService
     public event EventHandler? NowPlayingChanged;
     public event EventHandler? EncoderBitrateChanged;
 
-    public void Enqueue(string filePath)
-    {
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException("Audio file not found.", filePath);
+    public void Enqueue(string filePath) =>
+        Enqueue(PlaybackQueueItem.FromLocalFile(filePath));
 
-        if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
-        {
-            throw new NotSupportedException(
-                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF, FLAC.");
-        }
+    public void Enqueue(PlaybackQueueItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ValidateQueueItem(item);
 
         lock (_sync)
         {
             _queue.Add(new PlaybackQueueItem
             {
-                FilePath = filePath,
-                DisplayName = Path.GetFileName(filePath),
+                SourceKind = item.SourceKind,
+                FilePath = item.FilePath,
+                RemoteTrackId = item.RemoteTrackId,
+                DisplayName = item.DisplayName,
+                Artist = item.Artist,
+                Album = item.Album,
+                DurationSeconds = item.DurationSeconds,
                 Status = PlaybackQueueStatus.Queued
             });
 
             _logger.LogInformation(
-                "Queue enqueue: {FilePath} (queue size={QueueSize}, queued={QueuedCount})",
-                filePath, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
+                "Queue enqueue: {SourceKey} (queue size={QueueSize}, queued={QueuedCount})",
+                item.SourceKey, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
         }
 
         RaiseQueueChanged();
+    }
+
+    public void EnqueueRange(IEnumerable<PlaybackQueueItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        lock (_sync)
+        {
+            var added = 0;
+            foreach (var item in items)
+            {
+                ValidateQueueItem(item);
+                _queue.Add(new PlaybackQueueItem
+                {
+                    SourceKind = item.SourceKind,
+                    FilePath = item.FilePath,
+                    RemoteTrackId = item.RemoteTrackId,
+                    DisplayName = item.DisplayName,
+                    Artist = item.Artist,
+                    Album = item.Album,
+                    DurationSeconds = item.DurationSeconds,
+                    Status = PlaybackQueueStatus.Queued
+                });
+                added++;
+            }
+
+            _logger.LogInformation(
+                "Queue enqueue range: {Added} item(s) (queue size={QueueSize}, queued={QueuedCount})",
+                added, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
+        }
+
+        RaiseQueueChanged();
+    }
+
+    private void ValidateQueueItem(PlaybackQueueItem item)
+    {
+        if (item.SourceKind == PlaybackSourceKind.LocalFile)
+        {
+            if (!File.Exists(item.FilePath))
+                throw new FileNotFoundException("Audio file not found.", item.FilePath);
+
+            if (!Decoding.AudioFileDecoder.IsSupportedFile(item.FilePath))
+            {
+                throw new NotSupportedException(
+                    $"Unsupported audio format '{Path.GetExtension(item.FilePath)}'. Supported: MP3, WAV, AIFF, FLAC.");
+            }
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(item.RemoteTrackId))
+            throw new ArgumentException("Remote queue items require a track id.", nameof(item));
+
+        if (_streamUrlProvider is null)
+            throw new InvalidOperationException("Remote playback is not configured.");
+    }
+
+    private void OpenQueueItemLocked(PlaybackQueueItem item)
+    {
+        if (item.SourceKind == PlaybackSourceKind.LocalFile)
+        {
+            Music.OpenPlaybackItem(item);
+            return;
+        }
+
+        var streamUrl = _streamUrlProvider?.TryGetStreamUrl(item);
+        if (string.IsNullOrWhiteSpace(streamUrl))
+            throw new InvalidOperationException("Could not resolve remote stream URL.");
+
+        Music.OpenPlaybackItem(item, streamUrl);
     }
 
     public void RemoveFromQueue(int index)
@@ -206,7 +281,7 @@ public sealed class AudioMixerService : IAudioMixerService
                 return;
 
             _queue.RemoveAt(index);
-            _logger.LogInformation("Queue remove index {Index}: {FilePath}", index, item.FilePath);
+            _logger.LogInformation("Queue remove index {Index}: {SourceKey}", index, item.SourceKey);
         }
 
         RaiseQueueChanged();
@@ -252,12 +327,12 @@ public sealed class AudioMixerService : IAudioMixerService
 
             try
             {
-                Music.Open(target.FilePath);
+                OpenQueueItemLocked(target);
                 Music.Play();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to play queue item at index {Index}: {FilePath}", index, target.FilePath);
+                _logger.LogError(ex, "Failed to play queue item at index {Index}: {SourceKey}", index, target.SourceKey);
                 target.Status = PlaybackQueueStatus.Failed;
                 _nowPlaying = null;
                 RaiseQueueChanged();
@@ -270,7 +345,7 @@ public sealed class AudioMixerService : IAudioMixerService
                 _pipeline.ResyncForNewTrack();
 
             started = true;
-            _logger.LogInformation("PlayQueueItem index {Index}: {FilePath}", index, target.FilePath);
+            _logger.LogInformation("PlayQueueItem index {Index}: {SourceKey}", index, target.SourceKey);
         }
 
         if (started)
@@ -333,26 +408,26 @@ public sealed class AudioMixerService : IAudioMixerService
 
             if (_nowPlaying is not null && Music.CurrentTime > TimeSpan.FromSeconds(3))
             {
-                var path = _nowPlaying.FilePath;
+                var current = _nowPlaying;
                 try
                 {
-                    Music.Open(path);
+                    OpenQueueItemLocked(current);
                     Music.Play();
                     _pipeline.ResyncForNewTrack();
                     if (!_pipeline.IsTransmitting)
                         BeginTransmissionLocked();
                     changed = true;
-                    _logger.LogInformation("SkipPrevious — restarted current track: {FilePath}", path);
+                    _logger.LogInformation("SkipPrevious — restarted current track: {SourceKey}", current.SourceKey);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "SkipPrevious — failed to restart {FilePath}", path);
+                    _logger.LogError(ex, "SkipPrevious — failed to restart {SourceKey}", current.SourceKey);
                 }
             }
             else if (_playHistory.Count > 0)
             {
-                var previousPath = _playHistory.Pop();
-                var index = EnsureQueuedItemLocked(previousPath);
+                var previousItem = _playHistory.Pop();
+                var index = EnsureQueuedItemLocked(previousItem);
                 PushCurrentToHistoryLocked();
                 DemoteCurrentPlayingLocked();
 
@@ -362,18 +437,18 @@ public sealed class AudioMixerService : IAudioMixerService
 
                 try
                 {
-                    Music.Open(target.FilePath);
+                    OpenQueueItemLocked(target);
                     Music.Play();
                     if (!_pipeline.IsTransmitting)
                         BeginTransmissionLocked();
                     else
                         _pipeline.ResyncForNewTrack();
                     changed = true;
-                    _logger.LogInformation("SkipPrevious — playing history item: {FilePath}", previousPath);
+                    _logger.LogInformation("SkipPrevious — playing history item: {SourceKey}", previousItem.SourceKey);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "SkipPrevious — failed to play history item: {FilePath}", previousPath);
+                    _logger.LogError(ex, "SkipPrevious — failed to play history item: {SourceKey}", previousItem.SourceKey);
                     target.Status = PlaybackQueueStatus.Failed;
                     _nowPlaying = null;
                 }
@@ -392,8 +467,8 @@ public sealed class AudioMixerService : IAudioMixerService
         if (_nowPlaying is null)
             return;
 
-        if (_playHistory.Count == 0 || _playHistory.Peek() != _nowPlaying.FilePath)
-            _playHistory.Push(_nowPlaying.FilePath);
+        if (_playHistory.Count == 0 || _playHistory.Peek().SourceKey != _nowPlaying.SourceKey)
+            _playHistory.Push(CloneQueueItem(_nowPlaying));
     }
 
     private void DemoteCurrentPlayingLocked()
@@ -405,11 +480,11 @@ public sealed class AudioMixerService : IAudioMixerService
         }
     }
 
-    private int EnsureQueuedItemLocked(string filePath)
+    private int EnsureQueuedItemLocked(PlaybackQueueItem item)
     {
         for (var i = 0; i < _queue.Count; i++)
         {
-            if (_queue[i].FilePath == filePath)
+            if (_queue[i].SourceKey == item.SourceKey)
             {
                 if (_queue[i].Status != PlaybackQueueStatus.Playing)
                     _queue[i].Status = PlaybackQueueStatus.Queued;
@@ -417,14 +492,24 @@ public sealed class AudioMixerService : IAudioMixerService
             }
         }
 
-        _queue.Insert(0, new PlaybackQueueItem
-        {
-            FilePath = filePath,
-            DisplayName = Path.GetFileName(filePath),
-            Status = PlaybackQueueStatus.Queued
-        });
+        var clone = CloneQueueItem(item);
+        clone.Status = PlaybackQueueStatus.Queued;
+        _queue.Insert(0, clone);
         return 0;
     }
+
+    private static PlaybackQueueItem CloneQueueItem(PlaybackQueueItem item) =>
+        new()
+        {
+            SourceKind = item.SourceKind,
+            FilePath = item.FilePath,
+            RemoteTrackId = item.RemoteTrackId,
+            DisplayName = item.DisplayName,
+            Artist = item.Artist,
+            Album = item.Album,
+            DurationSeconds = item.DurationSeconds,
+            Status = item.Status
+        };
 
     public void Start()
     {
@@ -435,7 +520,7 @@ public sealed class AudioMixerService : IAudioMixerService
                 Music.ResumeOutput();
                 BeginTransmissionLocked();
                 _isPaused = false;
-                _logger.LogInformation("Resumed paused music track: {FilePath}", Music.CurrentFilePath);
+                _logger.LogInformation("Resumed paused music track: {SourceKey}", Music.CurrentFilePath);
                 return;
             }
 
@@ -524,9 +609,9 @@ public sealed class AudioMixerService : IAudioMixerService
         if (finished is not null)
         {
             finished.Status = PlaybackQueueStatus.Played;
-            if (_playHistory.Count == 0 || _playHistory.Peek() != finished.FilePath)
-                _playHistory.Push(finished.FilePath);
-            _logger.LogInformation("Track finished: {FilePath}", finished.FilePath);
+            if (_playHistory.Count == 0 || _playHistory.Peek().SourceKey != finished.SourceKey)
+                _playHistory.Push(CloneQueueItem(finished));
+            _logger.LogInformation("Track finished: {SourceKey}", finished.SourceKey);
         }
 
         var queuedCount = _queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
@@ -584,48 +669,39 @@ public sealed class AudioMixerService : IAudioMixerService
 
     private bool TryStartNextQueuedTrackLocked()
     {
-        var skipped = 0;
-
-        while (skipped < _queue.Count)
+        var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+        if (next is null)
         {
-            var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
-            if (next is null)
-            {
-                _logger.LogWarning("TryStartNextQueuedTrack: no item with Queued status");
-                return false;
-            }
-
-            foreach (var item in _queue)
-            {
-                if (item.Status == PlaybackQueueStatus.Playing)
-                    item.Status = PlaybackQueueStatus.Queued;
-            }
-
-            next.Status = PlaybackQueueStatus.Playing;
-            _nowPlaying = next;
-
-            try
-            {
-                Music.Open(next.FilePath);
-                Music.Play();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to open/play queued track: {FilePath}", next.FilePath);
-                next.Status = PlaybackQueueStatus.Failed;
-                _nowPlaying = null;
-                skipped++;
-                continue;
-            }
-
-            _logger.LogInformation(
-                "Now playing: {FilePath} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
-                next.FilePath, Music.IsPlaying, _pipeline.IsTransmitting);
-            return true;
+            _logger.LogWarning("TryStartNextQueuedTrack: no item with Queued status");
+            return false;
         }
 
-        _logger.LogWarning("TryStartNextQueuedTrack: all queued tracks failed to open");
-        return false;
+        foreach (var item in _queue)
+        {
+            if (item.Status == PlaybackQueueStatus.Playing)
+                item.Status = PlaybackQueueStatus.Queued;
+        }
+
+        next.Status = PlaybackQueueStatus.Playing;
+        _nowPlaying = next;
+
+        try
+        {
+            OpenQueueItemLocked(next);
+            Music.Play();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to open/play queued track: {SourceKey}", next.SourceKey);
+            next.Status = PlaybackQueueStatus.Queued;
+            _nowPlaying = null;
+            return false;
+        }
+
+        _logger.LogInformation(
+            "Now playing: {SourceKey} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
+            next.SourceKey, Music.IsPlaying, _pipeline.IsTransmitting);
+        return true;
     }
 
     private void BeginTransmissionLocked(bool forSoundboardOnly = false)
@@ -664,7 +740,7 @@ public sealed class AudioMixerService : IAudioMixerService
     {
         if (Music.TryConsumeTrackEnd(out var finishedPath))
         {
-            _logger.LogInformation("ProcessLifecycle: EOF consumed for {FilePath}", finishedPath);
+            _logger.LogInformation("ProcessLifecycle: EOF consumed for {SourceKey}", finishedPath);
             HandleTrackFinishedLocked();
             return;
         }
@@ -672,7 +748,7 @@ public sealed class AudioMixerService : IAudioMixerService
         if (Music.IsStalled(StalledReadThreshold))
         {
             _logger.LogWarning(
-                "ProcessLifecycle: stalled reads while playing {FilePath} — forcing track end",
+                "ProcessLifecycle: stalled reads while playing {SourceKey} — forcing track end",
                 Music.CurrentFilePath);
             Music.ForceTrackEnd();
             return;

@@ -1,0 +1,146 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TS_DJ.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="900"
+        d:DesignHeight="640"
+        x:Class="TS_DJ.App.Views.NavidromeBrowserWindow"
+        x:DataType="vm:NavidromeBrowserViewModel"
+        Title="Navidrome Library"
+        Width="900"
+        Height="640"
+        MinWidth="720"
+        MinHeight="480">
+
+    <Design.DataContext>
+        <vm:NavidromeBrowserViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="16" RowSpacing="12">
+
+        <!-- Connection -->
+        <Border Grid.Row="0" Padding="12" CornerRadius="8" BorderThickness="1"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="Navidrome Connection" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Opacity="0.8"/>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,*,Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="8">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Server" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerUrl}" PlaceholderText="http://10.0.0.1:4533"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Username" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Username}"/>
+
+                    <Button Grid.Row="0" Grid.Column="4" Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding Password}" PasswordChar="•"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Search -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Grid.Column="0" Text="{Binding SearchQuery}" PlaceholderText="Search tracks, artists, albums…"/>
+            <Button Grid.Column="1" Content="Search" Command="{Binding SearchCommand}" IsEnabled="{Binding CanSearch}"/>
+        </Grid>
+
+        <!-- Tabs -->
+        <TabControl Grid.Row="2" SelectedIndex="{Binding SelectedTabIndex}">
+            <TabItem Header="Tracks">
+                <ListBox ItemsSource="{Binding Tracks}"
+                         SelectedItem="{Binding SelectedTrack}"
+                         DoubleTapped="TracksList_OnDoubleTapped">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NavidromeTrackRowViewModel">
+                            <Grid ColumnDefinitions="2*,*,*,Auto" ColumnSpacing="12">
+                                <TextBlock Grid.Column="0" Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Artist}" Opacity="0.85" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Album}" Opacity="0.75" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="3" Text="{Binding DurationDisplay}" FontFamily="Consolas, Courier New, monospace"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+
+            <TabItem Header="Albums">
+                <ListBox ItemsSource="{Binding Albums}"
+                         SelectedItem="{Binding SelectedAlbum}"
+                         DoubleTapped="AlbumsList_OnDoubleTapped">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NavidromeAlbumRowViewModel">
+                            <Grid ColumnDefinitions="2*,*,Auto,Auto" ColumnSpacing="12">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Artist}" Opacity="0.85" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="2" Text="{Binding SongCount, StringFormat={}{0} songs}" Opacity="0.75"/>
+                                <TextBlock Grid.Column="3" Text="{Binding DurationDisplay}" FontFamily="Consolas, Courier New, monospace"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+
+            <TabItem Header="Artists">
+                <ListBox ItemsSource="{Binding Artists}"
+                         SelectedItem="{Binding SelectedArtist}"
+                         DoubleTapped="ArtistsList_OnDoubleTapped">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NavidromeArtistRowViewModel">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="1" Text="{Binding AlbumCount, StringFormat={}{0} albums}" Opacity="0.75"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+
+            <TabItem Header="Playlists">
+                <Grid ColumnDefinitions="*,2*" ColumnSpacing="12">
+                    <ListBox Grid.Column="0"
+                             ItemsSource="{Binding Playlists}"
+                             SelectedItem="{Binding SelectedPlaylist}"
+                             DoubleTapped="PlaylistsList_OnDoubleTapped">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NavidromePlaylistRowViewModel">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding SongCount, StringFormat={}{0} tracks}" FontSize="11" Opacity="0.75"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <DockPanel Grid.Column="1" LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Top" Text="Playlist preview" Opacity="0.75" Margin="0,0,0,8"/>
+                        <ListBox ItemsSource="{Binding PlaylistTracks}"
+                                 SelectedItem="{Binding SelectedPlaylistTrack}"
+                                 DoubleTapped="PlaylistTracksList_OnDoubleTapped">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:NavidromeTrackRowViewModel">
+                                    <Grid ColumnDefinitions="2*,*,Auto" ColumnSpacing="12">
+                                        <TextBlock Grid.Column="0" Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Artist}" Opacity="0.85" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DurationDisplay}" FontFamily="Consolas, Courier New, monospace"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Context-aware actions -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+            <Button Content="{Binding AddToQueueLabel}" Command="{Binding AddToQueueCommand}" IsEnabled="{Binding CanAddToQueue}"/>
+            <Button Content="{Binding PlayNowLabel}" Command="{Binding PlayNowCommand}" IsEnabled="{Binding CanPlayNow}"/>
+        </StackPanel>
+    </Grid>
+</Window>

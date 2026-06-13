@@ -3,6 +3,7 @@ using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using TS_DJ.Audio.Decoding;
 using TS_DJ.Core.Audio;
+using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
 
 namespace TS_DJ.Audio.Mixing.Sources;
@@ -20,7 +21,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
     private readonly GatedSampleProvider _gated;
     private readonly WaveFormat _format;
     private AudioFileDecoder? _decoder;
-    private string? _currentFilePath;
+    private string? _currentSourceKey;
     private float _volume = 1f;
     private bool _trackActive;
 
@@ -50,7 +51,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
     public bool IsPlaying => _trackActive;
     internal bool IsOutputting => _gated.IsPlaying;
     internal bool HasActiveTrack => _decoder is not null && _trackActive;
-    public string? CurrentFilePath => _currentFilePath;
+    public string? CurrentFilePath => _currentSourceKey;
 
     public TimeSpan CurrentTime
     {
@@ -84,19 +85,38 @@ public sealed class MusicTrackSource : IMusicTrackSource
 
     public void Open(string filePath)
     {
+        OpenPlaybackItem(PlaybackQueueItem.FromLocalFile(filePath));
+    }
+
+    public void OpenPlaybackItem(PlaybackQueueItem item, string? resolvedStreamUrl = null)
+    {
         lock (_sync)
         {
             StopInternal(logStop: false);
 
             _decoder = new AudioFileDecoder();
-            _decoder.Open(filePath);
-            _switchable.SetSource(_decoder.Output);
 
-            _currentFilePath = filePath;
+            if (item.SourceKind == PlaybackSourceKind.LocalFile)
+            {
+                _decoder.Open(item.FilePath);
+                _currentSourceKey = item.SourceKey;
+            }
+            else
+            {
+                var streamUrl = resolvedStreamUrl
+                    ?? throw new InvalidOperationException("Remote stream URL is required.");
+                var duration = item.DurationSeconds is > 0
+                    ? TimeSpan.FromSeconds(item.DurationSeconds.Value)
+                    : (TimeSpan?)null;
+                _decoder.OpenUri(streamUrl, duration);
+                _currentSourceKey = item.SourceKey;
+            }
+
+            _switchable.SetSource(_decoder.Output);
             RebindMixerInputLocked();
             _logger.LogInformation(
-                "Music track opened: {FilePath} (duration {Duration:F1}s)",
-                filePath, _decoder.TotalTime.TotalSeconds);
+                "Music track opened: {SourceKey} (duration {Duration:F1}s)",
+                _currentSourceKey, _decoder.TotalTime.TotalSeconds);
         }
     }
 
@@ -110,7 +130,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
             RebindMixerInputLocked();
             _trackActive = true;
             _gated.IsPlaying = true;
-            _logger.LogInformation("Music track started: {FilePath}", _currentFilePath);
+            _logger.LogInformation("Music track started: {SourceKey}", _currentSourceKey);
         }
     }
 
@@ -123,7 +143,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
 
             _gated.IsPlaying = false;
             _stalledReadCount = 0;
-            _logger.LogInformation("Music output paused: {FilePath}", _currentFilePath);
+            _logger.LogInformation("Music output paused: {SourceKey}", _currentSourceKey);
         }
     }
 
@@ -136,7 +156,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
 
             RebindMixerInputLocked();
             _gated.IsPlaying = true;
-            _logger.LogInformation("Music output resumed: {FilePath}", _currentFilePath);
+            _logger.LogInformation("Music output resumed: {SourceKey}", _currentSourceKey);
         }
     }
 
@@ -161,7 +181,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
             if (_decoder is null || !_decoder.ConsumeEofPending())
                 return false;
 
-            finishedPath = _currentFilePath;
+            finishedPath = _currentSourceKey;
             StopInternal(logStop: false);
             _logger.LogInformation("Music track EOF reached: {FilePath}", finishedPath);
             return true;
@@ -175,7 +195,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
             if (_decoder is null || !_gated.IsPlaying)
                 return;
 
-            _logger.LogWarning("Forcing track end: {FilePath}", _currentFilePath);
+            _logger.LogWarning("Forcing track end: {SourceKey}", _currentSourceKey);
             _decoder.ForceEnd();
         }
     }
@@ -201,8 +221,8 @@ public sealed class MusicTrackSource : IMusicTrackSource
 
     private void StopInternal(bool logStop)
     {
-        if (logStop && _currentFilePath is not null)
-            _logger.LogInformation("Music track stopped: {FilePath}", _currentFilePath);
+        if (logStop && _currentSourceKey is not null)
+            _logger.LogInformation("Music track stopped: {SourceKey}", _currentSourceKey);
 
         _trackActive = false;
         _gated.IsPlaying = false;
@@ -210,7 +230,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
         _decoder?.Dispose();
         _decoder = null;
         _switchable.SetSource(new IdleSampleProvider(_format));
-        _currentFilePath = null;
+        _currentSourceKey = null;
     }
 
     /// <summary>

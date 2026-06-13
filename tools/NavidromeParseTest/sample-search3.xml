@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subsonic-response xmlns="http://subsonic.org/restapi" status="ok" version="1.16.1">
+  <searchResult3>
+    <song id="abc" title="Every Breath You Take" artist="The Police" album="Synchronicity" duration="253"/>
+    <album id="def" name="Synchronicity" artist="The Police" songCount="8"/>
+    <artist id="ghi" name="The Police" albumCount="5"/>
+  </searchResult3>
+</subsonic-response>

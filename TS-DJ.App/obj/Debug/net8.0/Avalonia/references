@@ -47,6 +47,7 @@
 /home/berni/.nuget/packages/microsoft.extensions.filesystemglobbing/8.0.0/lib/net8.0/Microsoft.Extensions.FileSystemGlobbing.dll
 /home/berni/.nuget/packages/microsoft.extensions.hosting.abstractions/8.0.1/lib/net8.0/Microsoft.Extensions.Hosting.Abstractions.dll
 /home/berni/.nuget/packages/microsoft.extensions.hosting/8.0.1/lib/net8.0/Microsoft.Extensions.Hosting.dll
+/home/berni/.nuget/packages/microsoft.extensions.http/8.0.1/lib/net8.0/Microsoft.Extensions.Http.dll
 /home/berni/.nuget/packages/microsoft.extensions.logging.abstractions/8.0.2/lib/net8.0/Microsoft.Extensions.Logging.Abstractions.dll
 /home/berni/.nuget/packages/microsoft.extensions.logging.configuration/8.0.1/lib/net8.0/Microsoft.Extensions.Logging.Configuration.dll
 /home/berni/.nuget/packages/microsoft.extensions.logging.console/8.0.1/lib/net8.0/Microsoft.Extensions.Logging.Console.dll

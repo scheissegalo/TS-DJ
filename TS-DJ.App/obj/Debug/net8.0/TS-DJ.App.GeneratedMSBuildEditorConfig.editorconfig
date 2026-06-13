@@ -33,3 +33,6 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/Views/MainWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/Views/NavidromeBrowserWindow.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

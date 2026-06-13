@@ -16,7 +16,8 @@ public static class ServiceCollectionExtensions
             var soundboardLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Mixing.Sources.SoundEffectSource>>();
             var outputLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MixerOutputProducer>>();
             var teamSpeak = sp.GetRequiredService<TeamSpeak.TeamSpeakService>();
-            return new AudioMixerService(logger, musicLogger, soundboardLogger, outputLogger, teamSpeak, new Id(2));
+            var streamUrlProvider = sp.GetService<IPlaybackStreamUrlProvider>();
+            return new AudioMixerService(logger, musicLogger, soundboardLogger, outputLogger, teamSpeak, new Id(2), streamUrlProvider);
         });
         services.AddSingleton<IAudioMixerService>(sp => sp.GetRequiredService<AudioMixerService>());
         services.AddSingleton<IAudioPlaybackService, AudioPlaybackService>();

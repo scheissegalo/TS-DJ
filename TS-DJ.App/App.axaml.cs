@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using TS_DJ.App.Services;
 using TS_DJ.App.ViewModels;
 using TS_DJ.App.Views;
+using TS_DJ.Core.Services;
 using TS_DJ.Audio.DependencyInjection;
 using TS_DJ.Infrastructure.DependencyInjection;
 using TS_DJ.Infrastructure.Logging;
@@ -34,6 +35,9 @@ public partial class App : Application
                 services.AddTsDjInfrastructure();
                 services.AddTsDjTeamSpeak();
                 services.AddTsDjAudio();
+                services.AddSingleton<NavidromeMediaQueueService>();
+                services.AddSingleton<INavidromeMediaQueueService>(sp => sp.GetRequiredService<NavidromeMediaQueueService>());
+                services.AddTransient<NavidromeBrowserViewModel>();
                 services.AddSingleton<SoundboardViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<ApplicationShutdownService>();
@@ -42,6 +46,8 @@ public partial class App : Application
             {
                 logging.AddConsole();
                 logging.SetMinimumLevel(LogLevel.Information);
+                // Avoid logging Navidrome stream/auth URLs from HttpClient
+                logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
             })
             .Build();
 

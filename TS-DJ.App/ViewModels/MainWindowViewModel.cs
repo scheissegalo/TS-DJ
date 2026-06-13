@@ -4,6 +4,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TS_DJ.Audio;
 using TS_DJ.Core.Audio;
@@ -108,6 +109,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool CanSkipPrevious => IsConnected && (_audioMixerService.CanSkipPrevious || IsPlaying || IsPaused);
     public bool CanRemoveQueueItem =>
         SelectedQueueItem is not null && SelectedQueueItem.Status != PlaybackQueueStatus.Playing;
+
+    public bool CanClearQueue =>
+        _audioMixerService.Queue.Any(i => i.Status != PlaybackQueueStatus.Playing);
 
     private bool HasQueuedItemsRemaining =>
         _audioMixerService.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
@@ -262,6 +266,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private void OpenNavidromeBrowser()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            return;
+        }
+
+        var viewModel = App.Services.GetRequiredService<NavidromeBrowserViewModel>();
+        var window = new Views.NavidromeBrowserWindow
+        {
+            DataContext = viewModel
+        };
+
+        if (desktop.MainWindow is Window owner)
+            window.Show(owner);
+        else
+            window.Show();
+    }
+
+    [RelayCommand]
     private async Task BrowseFileAsync()
     {
         if (Avalonia.Application.Current?.ApplicationLifetime is not
@@ -350,6 +375,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
 
         _audioPlaybackService.RemoveFromQueue(index);
+        SelectedQueueItem = null;
+        NotifyCommandStatesChanged();
+    }
+
+    [RelayCommand]
+    private void ClearQueue()
+    {
+        _audioMixerService.ClearQueue();
         SelectedQueueItem = null;
         NotifyCommandStatesChanged();
     }
@@ -627,6 +660,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CanSkipNext));
         OnPropertyChanged(nameof(CanSkipPrevious));
         OnPropertyChanged(nameof(CanRemoveQueueItem));
+        OnPropertyChanged(nameof(CanClearQueue));
     }
 
     private void LogError(string message, Exception ex)

@@ -16,6 +16,9 @@ public interface ISettingsService
     Task<UiSettings> LoadUiSettingsAsync(CancellationToken cancellationToken = default);
     Task SaveUiSettingsAsync(UiSettings settings, CancellationToken cancellationToken = default);
 
+    Task<NavidromeSettings> LoadNavidromeSettingsAsync(CancellationToken cancellationToken = default);
+    Task SaveNavidromeSettingsAsync(NavidromeSettings settings, CancellationToken cancellationToken = default);
+
     Task<string?> GetSettingAsync(string key, CancellationToken cancellationToken = default);
     Task SetSettingAsync(string key, string? value, CancellationToken cancellationToken = default);
 }

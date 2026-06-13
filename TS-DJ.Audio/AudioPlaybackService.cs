@@ -53,12 +53,12 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
     public event EventHandler<PlaybackState>? StateChanged;
 
-    public async Task LoadAsync(string filePath, CancellationToken cancellationToken = default)
+    public async Task LoadAsync(PlaybackQueueItem item, CancellationToken cancellationToken = default)
     {
-        _mixer.Enqueue(filePath);
+        _mixer.Enqueue(item);
         _logger.LogInformation(
-            "Enqueued via LoadAsync: {FilePath} (queue size={QueueSize})",
-            filePath, _mixer.Queue.Count);
+            "Enqueued via LoadAsync: {SourceKey} (queue size={QueueSize})",
+            item.SourceKey, _mixer.Queue.Count);
 
         if (!_teamSpeak.Client.Connected)
             return;
@@ -66,8 +66,8 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         if (_mixer.Music.IsPlaying)
         {
             _logger.LogInformation(
-                "LoadAsync: mixer already playing — {FilePath} queued for auto-advance",
-                filePath);
+                "LoadAsync: mixer already playing — {SourceKey} queued for auto-advance",
+                item.SourceKey);
             return;
         }
 
@@ -75,6 +75,11 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
             return;
 
         await PlayAsync(cancellationToken);
+    }
+
+    public async Task LoadAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        await LoadAsync(PlaybackQueueItem.FromLocalFile(filePath), cancellationToken);
     }
 
     public Task PlayAsync(CancellationToken cancellationToken = default)

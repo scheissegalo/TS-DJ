@@ -13,6 +13,7 @@ public interface IAudioPlaybackService
     event EventHandler<PlaybackState>? StateChanged;
 
     Task LoadAsync(string filePath, CancellationToken cancellationToken = default);
+    Task LoadAsync(PlaybackQueueItem item, CancellationToken cancellationToken = default);
     Task PlayAsync(CancellationToken cancellationToken = default);
     Task PauseAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);

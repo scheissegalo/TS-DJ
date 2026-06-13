@@ -21,15 +21,22 @@ internal sealed class EofTrackingSampleProvider : ISampleProvider
     private int _consecutiveZeroReads;
     private long _deliveredSamples;
 
-    public EofTrackingSampleProvider(WaveStream reader, ISampleProvider resampled)
+    public EofTrackingSampleProvider(WaveStream reader, ISampleProvider resampled, TimeSpan? knownDuration = null)
     {
         _reader = reader;
         _resampled = resampled;
         WaveFormat = resampled.WaveFormat;
 
-        _expectedSamples = reader.TotalTime > TimeSpan.Zero
-            ? (long)(reader.TotalTime.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels)
-            : -1;
+        if (knownDuration is { } duration && duration > TimeSpan.Zero)
+        {
+            _expectedSamples = (long)(duration.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels);
+        }
+        else
+        {
+            _expectedSamples = reader.TotalTime > TimeSpan.Zero
+                ? (long)(reader.TotalTime.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels)
+                : -1;
+        }
     }
 
     public WaveFormat WaveFormat { get; }

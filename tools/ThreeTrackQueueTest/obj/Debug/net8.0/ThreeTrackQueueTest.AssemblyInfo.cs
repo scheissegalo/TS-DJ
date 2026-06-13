@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ThreeTrackQueueTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+540712c840a5e36e6bf1b2f5bc460e1f8dfac76e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+09180407f71b2330a293cd0e35868a41a37954a7")]
 [assembly: System.Reflection.AssemblyProductAttribute("ThreeTrackQueueTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ThreeTrackQueueTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

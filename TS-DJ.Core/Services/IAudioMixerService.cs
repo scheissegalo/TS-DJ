@@ -17,6 +17,8 @@ public interface IAudioMixerService : IDisposable
     event EventHandler? NowPlayingChanged;
 
     void Enqueue(string filePath);
+    void Enqueue(PlaybackQueueItem item);
+    void EnqueueRange(IEnumerable<PlaybackQueueItem> items);
     void RemoveFromQueue(int index);
     void ClearQueue();
     void PlayQueueItem(int index);

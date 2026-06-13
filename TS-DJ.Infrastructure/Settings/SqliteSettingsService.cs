@@ -326,6 +326,67 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
         }
     }
 
+    public async Task<NavidromeSettings> LoadNavidromeSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, NavidromeSettings.ConfigKey, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                _logger.LogDebug("No Navidrome settings found — using defaults");
+                return new NavidromeSettings();
+            }
+
+            var settings = JsonSerializer.Deserialize<NavidromeSettings>(raw);
+            if (settings is null)
+            {
+                _logger.LogWarning("Invalid Navidrome settings — using defaults");
+                return new NavidromeSettings();
+            }
+
+            _logger.LogDebug("Loaded Navidrome settings from {DatabasePath}", _databasePath);
+            return settings;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load Navidrome settings from {DatabasePath}", _databasePath);
+            return new NavidromeSettings();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SaveNavidromeSettingsAsync(NavidromeSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(settings);
+            await WriteSettingAsync(connection, transaction, NavidromeSettings.ConfigKey, json, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Saved Navidrome settings to {DatabasePath}", _databasePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save Navidrome settings to {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not save Navidrome settings to '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     private static int ClampVolumeHuman(string? raw, int defaultValue)
     {
         if (!int.TryParse(raw, out var value))

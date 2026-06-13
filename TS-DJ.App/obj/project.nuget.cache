@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "5FEYMNGy2zw=",
+  "dgSpecHash": "/i1D5Z/hnOQ=",
   "success": true,
   "projectFilePath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
   "expectedPackageFiles": [
@@ -47,6 +47,7 @@
     "/home/berni/.nuget/packages/microsoft.extensions.filesystemglobbing/8.0.0/microsoft.extensions.filesystemglobbing.8.0.0.nupkg.sha512",
     "/home/berni/.nuget/packages/microsoft.extensions.hosting/8.0.1/microsoft.extensions.hosting.8.0.1.nupkg.sha512",
     "/home/berni/.nuget/packages/microsoft.extensions.hosting.abstractions/8.0.1/microsoft.extensions.hosting.abstractions.8.0.1.nupkg.sha512",
+    "/home/berni/.nuget/packages/microsoft.extensions.http/8.0.1/microsoft.extensions.http.8.0.1.nupkg.sha512",
     "/home/berni/.nuget/packages/microsoft.extensions.logging/8.0.1/microsoft.extensions.logging.8.0.1.nupkg.sha512",
     "/home/berni/.nuget/packages/microsoft.extensions.logging.abstractions/8.0.2/microsoft.extensions.logging.abstractions.8.0.2.nupkg.sha512",
     "/home/berni/.nuget/packages/microsoft.extensions.logging.configuration/8.0.1/microsoft.extensions.logging.configuration.8.0.1.nupkg.sha512",
