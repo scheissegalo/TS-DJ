@@ -93,6 +93,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private PlaybackQueueItemViewModel? _selectedQueueItem;
 
+    [ObservableProperty]
+    private bool _isSoundboardVisible = true;
+
+    public string SoundboardToggleLabel => IsSoundboardVisible ? "Hide Soundboard" : "Show Soundboard";
+
     public bool CanConnect => !IsConnected && !IsConnecting;
     public bool CanDisconnect => IsConnected;
     public bool CanPlay => IsConnected && HasQueueItems && !IsPlaying && !IsPaused;
@@ -117,6 +122,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         new(OpusBitratePresets.VeryHigh, OpusBitratePresets.Label(OpusBitratePresets.VeryHigh))
     ];
 
+    public SoundboardViewModel Soundboard { get; }
+
     public MainWindowViewModel(
         ILogger<MainWindowViewModel> logger,
         ITeamSpeakService teamSpeakService,
@@ -124,10 +131,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         IAudioMixerService audioMixerService,
         ISettingsService settingsService,
         ILogService logService,
-        TeamSpeakNicknameService nicknameService)
+        TeamSpeakNicknameService nicknameService,
+        SoundboardViewModel soundboardViewModel)
     {
         _logger = logger;
         _teamSpeakService = teamSpeakService;
+        Soundboard = soundboardViewModel;
         _audioPlaybackService = audioPlaybackService;
         _audioMixerService = audioMixerService;
         _settingsService = settingsService;
@@ -179,6 +188,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             OpusBitrateDisplay = OpusBitratePresets.Label(_audioMixerService.EncoderBitrateKbps);
             SelectedOpusBitrate = OpusBitrateOptions.FirstOrDefault(option => option.Kbps == _audioMixerService.EncoderBitrateKbps)
                 ?? OpusBitrateOptions[1];
+
+            var uiSettings = await _settingsService.LoadUiSettingsAsync();
+            IsSoundboardVisible = uiSettings.IsSoundboardVisible;
         }
         catch (Exception ex)
         {
@@ -203,6 +215,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }, cancellationToken);
 
             await SaveAudioSettingsAsync(cancellationToken);
+            await Soundboard.SaveForShutdownAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -340,6 +353,25 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedQueueItem = null;
         NotifyCommandStatesChanged();
     }
+
+    [RelayCommand]
+    private async Task ToggleSoundboardAsync()
+    {
+        IsSoundboardVisible = !IsSoundboardVisible;
+        try
+        {
+            var uiSettings = await _settingsService.LoadUiSettingsAsync();
+            uiSettings.IsSoundboardVisible = IsSoundboardVisible;
+            await _settingsService.SaveUiSettingsAsync(uiSettings);
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to save soundboard panel visibility", ex);
+        }
+    }
+
+    partial void OnIsSoundboardVisibleChanged(bool value) =>
+        OnPropertyChanged(nameof(SoundboardToggleLabel));
 
     partial void OnVolumeChanged(double value)
     {
@@ -628,5 +660,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioMixerService.NowPlayingChanged -= OnNowPlayingChanged;
         _audioMixerService.EncoderBitrateChanged -= OnEncoderBitrateChanged;
         _logService.EntryAdded -= OnLogEntryAdded;
+        Soundboard.Dispose();
     }
 }

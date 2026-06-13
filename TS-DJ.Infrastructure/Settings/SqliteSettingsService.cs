@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Models;
@@ -194,6 +195,67 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
         }
     }
 
+    public async Task<SoundboardSettings> LoadSoundboardSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, SoundboardSettings.ConfigKey, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                _logger.LogDebug("No soundboard settings found — using defaults");
+                return new SoundboardSettings();
+            }
+
+            var settings = JsonSerializer.Deserialize<SoundboardSettings>(raw);
+            if (settings is null || settings.Pads.Count != SoundboardSettings.PadCount)
+            {
+                _logger.LogWarning("Invalid soundboard settings — using defaults");
+                return new SoundboardSettings();
+            }
+
+            _logger.LogDebug("Loaded soundboard settings from {DatabasePath}", _databasePath);
+            return settings;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load soundboard settings from {DatabasePath}", _databasePath);
+            return new SoundboardSettings();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SaveSoundboardSettingsAsync(SoundboardSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(settings);
+            await WriteSettingAsync(connection, transaction, SoundboardSettings.ConfigKey, json, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Saved soundboard settings to {DatabasePath}", _databasePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save soundboard settings to {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not save soundboard settings to '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task<UiSettings> LoadUiSettingsAsync(CancellationToken cancellationToken = default)
     {
         await _lock.WaitAsync(cancellationToken);
@@ -207,7 +269,9 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
                 Height = ParseNullableDouble(await ReadSettingAsync(connection, UiSettings.HeightKey, cancellationToken)),
                 X = ParseNullableDouble(await ReadSettingAsync(connection, UiSettings.XKey, cancellationToken)),
                 Y = ParseNullableDouble(await ReadSettingAsync(connection, UiSettings.YKey, cancellationToken)),
-                WindowState = await ReadSettingAsync(connection, UiSettings.WindowStateKey, cancellationToken) ?? "Normal"
+                WindowState = await ReadSettingAsync(connection, UiSettings.WindowStateKey, cancellationToken) ?? "Normal",
+                IsSoundboardVisible = ParseNullableBool(
+                    await ReadSettingAsync(connection, UiSettings.SoundboardVisibleKey, cancellationToken), defaultValue: true)
             };
 
             _logger.LogDebug("Loaded UI settings from {DatabasePath}", _databasePath);
@@ -244,6 +308,8 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
             await WriteSettingAsync(connection, transaction, UiSettings.YKey,
                 settings.Y?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, cancellationToken);
             await WriteSettingAsync(connection, transaction, UiSettings.WindowStateKey, settings.WindowState, cancellationToken);
+            await WriteSettingAsync(connection, transaction, UiSettings.SoundboardVisibleKey,
+                settings.IsSoundboardVisible.ToString(), cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             _logger.LogDebug("Saved UI settings to {DatabasePath}", _databasePath);
@@ -281,6 +347,9 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
             System.Globalization.CultureInfo.InvariantCulture, out var value)
             ? value
             : null;
+
+    private static bool ParseNullableBool(string? raw, bool defaultValue) =>
+        bool.TryParse(raw, out var value) ? value : defaultValue;
 
     public async Task<string?> GetSettingAsync(string key, CancellationToken cancellationToken = default)
     {

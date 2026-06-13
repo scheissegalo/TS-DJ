@@ -28,6 +28,10 @@ public interface IAudioMixerService : IDisposable
     void Pause();
     void Stop();
 
+    void PlaySoundEffect(string filePath);
+
+    float SoundboardVolume { get; set; }
+
     int EncoderBitrateKbps { get; set; }
 
     event EventHandler? EncoderBitrateChanged;

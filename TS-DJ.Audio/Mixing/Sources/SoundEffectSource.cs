@@ -16,9 +16,11 @@ public sealed class SoundEffectSource : ISoundEffectSource
 
     private readonly ILogger<SoundEffectSource> _logger;
     private readonly object _sync;
+    private readonly MixingSampleProvider _mainMixer;
     private readonly MixerChannel _channel;
     private readonly MixingSampleProvider _effectMixer;
     private readonly List<OneShotSampleProvider> _activeEffects = [];
+    private readonly PreloadedClipCache? _clipCache;
     private float _volume = 1f;
 
     public SoundEffectSource(
@@ -26,22 +28,55 @@ public sealed class SoundEffectSource : ISoundEffectSource
         string name,
         MixingSampleProvider mainMixer,
         object sync,
-        ILogger<SoundEffectSource> logger)
+        ILogger<SoundEffectSource> logger,
+        PreloadedClipCache? clipCache = null)
     {
         Id = id;
         Name = name;
         _sync = sync;
+        _mainMixer = mainMixer;
         _logger = logger;
+        _clipCache = clipCache;
 
         var format = WaveFormat.CreateIeeeFloatWaveFormat(AudioFormat.SampleRate, AudioFormat.Channels);
-        _effectMixer = new MixingSampleProvider(format);
+        _effectMixer = new MixingSampleProvider(format)
+        {
+            ReadFully = false
+        };
         _channel = new MixerChannel(_effectMixer);
         _channel.Attach(mainMixer);
+        _logger.LogInformation("Soundboard channel attached to main mixer");
     }
 
     public string Id { get; }
     public string Name { get; }
-    public bool IsActive => _activeEffects.Count > 0;
+
+    public bool IsActive
+    {
+        get
+        {
+            lock (_sync)
+                return _activeEffects.Any(e => !e.IsFinished);
+        }
+    }
+
+    internal int ActiveEffectCount
+    {
+        get
+        {
+            lock (_sync)
+                return _activeEffects.Count(e => !e.IsFinished);
+        }
+    }
+
+    internal bool IsChannelAttached
+    {
+        get
+        {
+            lock (_sync)
+                return _channel.IsAttached;
+        }
+    }
 
     public float Volume
     {
@@ -59,26 +94,42 @@ public sealed class SoundEffectSource : ISoundEffectSource
         {
             CleanupFinishedEffects();
 
-            if (_activeEffects.Count >= MaxConcurrentEffects)
+            if (_activeEffects.Count(e => !e.IsFinished) >= MaxConcurrentEffects)
             {
                 _logger.LogWarning("Sound effect limit reached ({Limit}); dropping {FilePath}",
                     MaxConcurrentEffects, filePath);
                 return;
             }
 
-            var decoder = new AudioFileDecoder();
-            decoder.Open(filePath);
+            RebindMixerInputLocked();
 
-            var oneShot = new OneShotSampleProvider(
-                decoder.Output,
-                RemoveEffect)
+            OneShotSampleProvider oneShot;
+
+            var cached = _clipCache?.Get(filePath);
+            if (cached is not null)
             {
-                Resource = decoder
-            };
+                var provider = cached.CreateProvider();
+                oneShot = new OneShotSampleProvider(provider);
+                _logger.LogDebug("Playing cached sound effect: {FilePath}", filePath);
+            }
+            else
+            {
+                var decoder = new AudioFileDecoder();
+                decoder.Open(filePath);
+
+                oneShot = new OneShotSampleProvider(decoder.Output)
+                {
+                    Resource = decoder
+                };
+                _logger.LogDebug("Playing sound effect (file decode): {FilePath}", filePath);
+            }
 
             _effectMixer.AddMixerInput(oneShot);
             _activeEffects.Add(oneShot);
-            _logger.LogDebug("Playing sound effect: {FilePath}", filePath);
+
+            _logger.LogInformation(
+                "Sound effect added: {FilePath} (live={LiveCount}, attached={Attached})",
+                filePath, _activeEffects.Count(e => !e.IsFinished), _channel.IsAttached);
         }
     }
 
@@ -86,17 +137,15 @@ public sealed class SoundEffectSource : ISoundEffectSource
     {
         lock (_sync)
         {
+            var before = _activeEffects.Count;
             CleanupFinishedEffects();
-        }
-    }
-
-    private void RemoveEffect(OneShotSampleProvider effect)
-    {
-        lock (_sync)
-        {
-            _effectMixer.RemoveMixerInput(effect);
-            _activeEffects.Remove(effect);
-            effect.Resource?.Dispose();
+            var removed = before - _activeEffects.Count;
+            if (removed > 0)
+            {
+                _logger.LogDebug(
+                    "Soundboard cleanup: removed {Removed} finished effect(s), live={LiveCount}, attached={Attached}",
+                    removed, _activeEffects.Count(e => !e.IsFinished), _channel.IsAttached);
+            }
         }
     }
 
@@ -108,10 +157,20 @@ public sealed class SoundEffectSource : ISoundEffectSource
             if (!effect.IsFinished)
                 continue;
 
-            _effectMixer.RemoveMixerInput(effect);
             _activeEffects.RemoveAt(i);
             effect.Resource?.Dispose();
+            _logger.LogDebug("Sound effect disposed after EOF");
         }
+    }
+
+    /// <summary>
+    /// NAudio drops mixer inputs that return 0 samples. Re-attach before each trigger.
+    /// </summary>
+    private void RebindMixerInputLocked()
+    {
+        _channel.Detach();
+        _channel.Attach(_mainMixer);
+        _logger.LogDebug("Soundboard mixer input re-bound to main mixer");
     }
 
     public void Dispose()
@@ -120,12 +179,15 @@ public sealed class SoundEffectSource : ISoundEffectSource
         {
             foreach (var effect in _activeEffects.ToArray())
             {
-                _effectMixer.RemoveMixerInput(effect);
+                if (!effect.IsFinished)
+                    _effectMixer.RemoveMixerInput(effect);
+
                 effect.Resource?.Dispose();
             }
 
             _activeEffects.Clear();
             _channel.Detach();
+            _logger.LogInformation("Soundboard channel detached and disposed");
         }
     }
 }

@@ -17,7 +17,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
     private readonly IWaveProvider _waveProvider;
     private readonly Func<bool> _hasActiveAudio;
     private readonly Action _processLifecycle;
-    private readonly Action? _beforeRead;
+    private readonly Action? _afterRead;
     private readonly Action<int>? _onMixedRead;
     private readonly ILogger<MixerOutputProducer>? _logger;
     private byte[] _readBuffer = Array.Empty<byte>();
@@ -31,7 +31,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
         object sync,
         Func<bool> hasActiveAudio,
         Action processLifecycle,
-        Action? beforeRead = null,
+        Action? afterRead = null,
         Action<int>? onMixedRead = null,
         ILogger<MixerOutputProducer>? logger = null)
     {
@@ -39,7 +39,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
         _sync = sync;
         _hasActiveAudio = hasActiveAudio;
         _processLifecycle = processLifecycle;
-        _beforeRead = beforeRead;
+        _afterRead = afterRead;
         _onMixedRead = onMixedRead;
         _logger = logger;
         _waveProvider = mixer.ToWaveProvider16();
@@ -56,51 +56,59 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
 
         lock (_sync)
         {
-            _beforeRead?.Invoke();
-
-            if (!_hasActiveAudio())
+            try
             {
-                _zeroReadCount++;
-                if (!_loggedIdleRead)
+                if (!_hasActiveAudio())
                 {
-                    _logger?.LogInformation(
-                        "MixerOutputProducer: idle — returning 0 bytes (read #{ReadCount}, active sources=false)",
-                        _readCount);
-                    _loggedIdleRead = true;
+                    _zeroReadCount++;
+                    if (!_loggedIdleRead)
+                    {
+                        _logger?.LogInformation(
+                            "MixerOutputProducer: idle — returning 0 bytes (read #{ReadCount}, active sources=false)",
+                            _readCount);
+                        _loggedIdleRead = true;
+                    }
+
+                    _afterRead?.Invoke();
+                    _processLifecycle();
+                    return 0;
                 }
 
-                _processLifecycle();
-                return 0;
-            }
+                _loggedIdleRead = false;
 
-            _loggedIdleRead = false;
+                if (_readBuffer.Length < length)
+                    _readBuffer = new byte[length];
 
-            if (_readBuffer.Length < length)
-                _readBuffer = new byte[length];
-
-            var read = _waveProvider.Read(_readBuffer, 0, length);
-            if (read > 0)
-            {
-                _nonZeroReadCount++;
-                Buffer.BlockCopy(_readBuffer, 0, buffer, offset, read);
-                if (_nonZeroReadCount == 1 || _nonZeroReadCount % 500 == 0)
+                var read = _waveProvider.Read(_readBuffer, 0, length);
+                if (read > 0)
                 {
+                    _nonZeroReadCount++;
+                    Buffer.BlockCopy(_readBuffer, 0, buffer, offset, read);
+                    if (_nonZeroReadCount == 1 || _nonZeroReadCount % 500 == 0)
+                    {
+                        _logger?.LogDebug(
+                            "MixerOutputProducer: read {Bytes} bytes (read #{ReadCount}, nonZero=#{NonZero})",
+                            read, _readCount, _nonZeroReadCount);
+                    }
+                }
+                else
+                {
+                    _zeroReadCount++;
                     _logger?.LogDebug(
-                        "MixerOutputProducer: read {Bytes} bytes (read #{ReadCount}, nonZero=#{NonZero})",
-                        read, _readCount, _nonZeroReadCount);
+                        "MixerOutputProducer: read 0 bytes while sources marked active (read #{ReadCount}, zero=#{Zero})",
+                        _readCount, _zeroReadCount);
                 }
-            }
-            else
-            {
-                _zeroReadCount++;
-                _logger?.LogDebug(
-                    "MixerOutputProducer: read 0 bytes while sources active (read #{ReadCount}, zero=#{Zero})",
-                    _readCount, _zeroReadCount);
-            }
 
-            _processLifecycle();
-            _onMixedRead?.Invoke(read);
-            return read;
+                _onMixedRead?.Invoke(read);
+                _afterRead?.Invoke();
+                _processLifecycle();
+                return read;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "MixerOutputProducer: exception during read #{ReadCount}", _readCount);
+                throw;
+            }
         }
     }
 

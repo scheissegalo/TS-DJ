@@ -22,6 +22,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
     private AudioFileDecoder? _decoder;
     private string? _currentFilePath;
     private float _volume = 1f;
+    private bool _trackActive;
 
     public MusicTrackSource(
         string id,
@@ -46,7 +47,9 @@ public sealed class MusicTrackSource : IMusicTrackSource
     public string Id { get; }
     public string Name { get; }
     public bool IsActive => IsPlaying;
-    public bool IsPlaying => _gated.IsPlaying;
+    public bool IsPlaying => _trackActive;
+    internal bool IsOutputting => _gated.IsPlaying;
+    internal bool HasActiveTrack => _decoder is not null && _trackActive;
     public string? CurrentFilePath => _currentFilePath;
 
     public TimeSpan CurrentTime
@@ -105,8 +108,35 @@ public sealed class MusicTrackSource : IMusicTrackSource
                 throw new InvalidOperationException("No track is open.");
 
             RebindMixerInputLocked();
+            _trackActive = true;
             _gated.IsPlaying = true;
             _logger.LogInformation("Music track started: {FilePath}", _currentFilePath);
+        }
+    }
+
+    internal void PauseOutput()
+    {
+        lock (_sync)
+        {
+            if (!_trackActive)
+                return;
+
+            _gated.IsPlaying = false;
+            _stalledReadCount = 0;
+            _logger.LogInformation("Music output paused: {FilePath}", _currentFilePath);
+        }
+    }
+
+    internal void ResumeOutput()
+    {
+        lock (_sync)
+        {
+            if (!_trackActive || _decoder is null)
+                return;
+
+            RebindMixerInputLocked();
+            _gated.IsPlaying = true;
+            _logger.LogInformation("Music output resumed: {FilePath}", _currentFilePath);
         }
     }
 
@@ -174,6 +204,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
         if (logStop && _currentFilePath is not null)
             _logger.LogInformation("Music track stopped: {FilePath}", _currentFilePath);
 
+        _trackActive = false;
         _gated.IsPlaying = false;
         _stalledReadCount = 0;
         _decoder?.Dispose();

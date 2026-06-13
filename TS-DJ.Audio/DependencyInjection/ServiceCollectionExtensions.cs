@@ -20,6 +20,8 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<IAudioMixerService>(sp => sp.GetRequiredService<AudioMixerService>());
         services.AddSingleton<IAudioPlaybackService, AudioPlaybackService>();
+        services.AddSingleton<SoundboardService>();
+        services.AddSingleton<ISoundboardService>(sp => sp.GetRequiredService<SoundboardService>());
         return services;
     }
 }

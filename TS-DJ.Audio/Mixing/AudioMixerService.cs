@@ -26,6 +26,8 @@ public sealed class AudioMixerService : IAudioMixerService
     private bool _isPaused;
     private const int StalledReadThreshold = 50;
 
+    public PreloadedClipCache ClipCache { get; } = new();
+
     public AudioMixerService(
         ILogger<AudioMixerService> logger,
         ILogger<MusicTrackSource> musicLogger,
@@ -44,7 +46,7 @@ public sealed class AudioMixerService : IAudioMixerService
         };
 
         Music = new MusicTrackSource("music", "Music", _mixer, _sync, musicLogger);
-        Soundboard = new SoundEffectSource("soundboard", "Soundboard", _mixer, _sync, soundboardLogger);
+        Soundboard = new SoundEffectSource("soundboard", "Soundboard", _mixer, _sync, soundboardLogger, ClipCache);
         Microphone = new MicrophoneSource("microphone", "Microphone");
 
         _outputProducer = new MixerOutputProducer(
@@ -122,6 +124,42 @@ public sealed class AudioMixerService : IAudioMixerService
                 _encoderBitrateKbps, _encoderBitrateKbps * 1000);
             EncoderBitrateChanged?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    public float SoundboardVolume
+    {
+        get => Soundboard.Volume;
+        set => Soundboard.Volume = Math.Clamp(value, 0f, 1f);
+    }
+
+    public void PlaySoundEffect(string filePath)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Audio file not found.", filePath);
+
+        if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
+        {
+            throw new NotSupportedException(
+                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF.");
+        }
+
+        lock (_sync)
+        {
+            Soundboard.Play(filePath);
+
+            var active = HasActiveAudioLocked();
+            var transmitting = _pipeline.IsTransmitting;
+            var sfxCount = Soundboard.ActiveEffectCount;
+
+            _logger.LogInformation(
+                "PlaySoundEffect state: active={Active}, transmitting={Transmitting}, sfxLive={SfxCount}, channelAttached={Attached}, musicOutputting={MusicOutputting}",
+                active, transmitting, sfxCount, Soundboard.IsChannelAttached, Music.IsOutputting);
+
+            if (active && !transmitting)
+                BeginTransmissionLocked(forSoundboardOnly: _isPaused || !Music.IsOutputting);
+        }
+
+        _logger.LogInformation("Sound effect triggered: {FilePath}", filePath);
     }
 
     public event EventHandler? QueueChanged;
@@ -257,7 +295,14 @@ public sealed class AudioMixerService : IAudioMixerService
 
             if (!TryStartNextQueuedTrackLocked())
             {
-                EnterIdleLocked("skip next — queue empty");
+                if (Soundboard.IsActive)
+                {
+                    _nowPlaying = null;
+                    if (!_pipeline.IsTransmitting)
+                        BeginTransmissionLocked();
+                }
+                else
+                    EnterIdleLocked("skip next — queue empty");
                 advanced = false;
             }
             else
@@ -385,13 +430,22 @@ public sealed class AudioMixerService : IAudioMixerService
     {
         lock (_sync)
         {
-            if (Music.IsPlaying)
+            if (_isPaused && Music.HasActiveTrack)
             {
-                if (_isPaused || !_pipeline.IsTransmitting)
+                Music.ResumeOutput();
+                BeginTransmissionLocked();
+                _isPaused = false;
+                _logger.LogInformation("Resumed paused music track: {FilePath}", Music.CurrentFilePath);
+                return;
+            }
+
+            if (Music.IsOutputting)
+            {
+                if (!_pipeline.IsTransmitting)
                 {
                     _logger.LogInformation(
-                        "Resuming voice transmission (paused={Paused}, transmitting={Transmitting})",
-                        _isPaused, _pipeline.IsTransmitting);
+                        "Resuming voice transmission (transmitting={Transmitting})",
+                        _pipeline.IsTransmitting);
                     BeginTransmissionLocked();
                 }
 
@@ -407,7 +461,7 @@ public sealed class AudioMixerService : IAudioMixerService
             BeginTransmissionLocked();
         }
 
-        if (Music.IsPlaying)
+        if (Music.IsOutputting)
             _pipeline.ResyncForNewTrack();
 
         RaiseNowPlayingChanged();
@@ -418,11 +472,16 @@ public sealed class AudioMixerService : IAudioMixerService
     {
         lock (_sync)
         {
-            if (!Music.IsPlaying && !_isPaused)
+            if (!Music.HasActiveTrack && !_isPaused)
                 return;
 
-            StopTransmissionLocked("paused");
-            _isPaused = true;
+            if (Music.HasActiveTrack)
+                Music.PauseOutput();
+
+            _isPaused = Music.HasActiveTrack;
+
+            if (!HasActiveAudioLocked())
+                StopTransmissionLocked("paused");
         }
     }
 
@@ -430,8 +489,6 @@ public sealed class AudioMixerService : IAudioMixerService
     {
         lock (_sync)
         {
-            StopTransmissionLocked("stopped");
-
             if (_nowPlaying is not null)
             {
                 // A track stuck at EOF still reports IsPlaying; don't re-queue it ahead of later tracks.
@@ -446,6 +503,14 @@ public sealed class AudioMixerService : IAudioMixerService
             Music.Stop();
             _isPaused = false;
             _playHistory.Clear();
+
+            if (Soundboard.IsActive)
+            {
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked(forSoundboardOnly: true);
+            }
+            else
+                StopTransmissionLocked("stopped");
         }
 
         RaiseNowPlayingChanged();
@@ -484,7 +549,13 @@ public sealed class AudioMixerService : IAudioMixerService
             {
                 _logger.LogError("Queue advance failed despite {QueuedCount} queued items — entering idle", queuedCount);
                 _nowPlaying = null;
-                EnterIdleLocked("queue advance failed");
+                if (Soundboard.IsActive)
+                {
+                    if (!_pipeline.IsTransmitting)
+                        BeginTransmissionLocked(forSoundboardOnly: true);
+                }
+                else
+                    EnterIdleLocked("queue advance failed");
             }
             else
             {
@@ -496,7 +567,13 @@ public sealed class AudioMixerService : IAudioMixerService
         else
         {
             _nowPlaying = null;
-            EnterIdleLocked("queue finished");
+            if (Soundboard.IsActive)
+            {
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked(forSoundboardOnly: true);
+            }
+            else
+                EnterIdleLocked("queue finished");
         }
 
         RaiseNowPlayingChanged();
@@ -551,14 +628,15 @@ public sealed class AudioMixerService : IAudioMixerService
         return false;
     }
 
-    private void BeginTransmissionLocked()
+    private void BeginTransmissionLocked(bool forSoundboardOnly = false)
     {
         _pipeline.ResetTimer();
         _pipeline.Start();
-        _isPaused = false;
+        if (!forSoundboardOnly)
+            _isPaused = false;
         _logger.LogInformation(
-            "Voice transmission started (music.IsPlaying={IsPlaying}, soundboard.active={SoundboardActive})",
-            Music.IsPlaying, Soundboard.IsActive);
+            "Voice transmission started (music.outputting={IsOutputting}, soundboard.active={SoundboardActive}, soundboardOnly={SoundboardOnly})",
+            Music.IsOutputting, Soundboard.IsActive, forSoundboardOnly);
     }
 
     private void StopTransmissionLocked(string reason)
@@ -580,7 +658,7 @@ public sealed class AudioMixerService : IAudioMixerService
     }
 
     private bool HasActiveAudioLocked() =>
-        Music.IsPlaying || Soundboard.IsActive;
+        Music.IsOutputting || Soundboard.IsActive;
 
     private void ProcessLifecycleLocked()
     {
@@ -602,7 +680,9 @@ public sealed class AudioMixerService : IAudioMixerService
 
         if (!HasActiveAudioLocked() && _pipeline.IsTransmitting)
         {
-            _logger.LogInformation("ProcessLifecycle: no active sources while pipeline still transmitting — forcing idle");
+            _logger.LogInformation(
+                "ProcessLifecycle: no active sources while pipeline still transmitting — forcing idle (music.outputting={MusicOutputting}, sfxLive={SfxCount}, channelAttached={Attached})",
+                Music.IsOutputting, Soundboard.ActiveEffectCount, Soundboard.IsChannelAttached);
             EnterIdleLocked("no active sources during read");
         }
     }

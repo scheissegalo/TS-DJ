@@ -34,6 +34,7 @@ public partial class App : Application
                 services.AddTsDjInfrastructure();
                 services.AddTsDjTeamSpeak();
                 services.AddTsDjAudio();
+                services.AddSingleton<SoundboardViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<ApplicationShutdownService>();
             })

@@ -7,10 +7,12 @@ public sealed class UiSettings
     public const string XKey = "ui.window.x";
     public const string YKey = "ui.window.y";
     public const string WindowStateKey = "ui.window.state";
+    public const string SoundboardVisibleKey = "ui.soundboard.visible";
 
     public double? Width { get; set; }
     public double? Height { get; set; }
     public double? X { get; set; }
     public double? Y { get; set; }
     public string WindowState { get; set; } = "Normal";
+    public bool IsSoundboardVisible { get; set; } = true;
 }

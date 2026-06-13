@@ -4,136 +4,197 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        d:DesignWidth="900"
-        d:DesignHeight="640"
+        d:DesignWidth="1100"
+        d:DesignHeight="580"
         x:Class="TS_DJ.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="TS-DJ"
-        Width="900"
-        Height="640"
+        Width="1100"
+        Height="580"
         MinWidth="720"
-        MinHeight="520">
+        MinHeight="520"
+        Focusable="True"
+        KeyDown="MainWindow_OnKeyDown">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="16" RowSpacing="12">
+    <Grid ColumnDefinitions="*,Auto" Margin="16" ColumnSpacing="12">
 
-        <!-- Connection -->
-        <Border Grid.Row="0" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
-            <StackPanel Spacing="10">
-                <TextBlock Text="TeamSpeak Connection" FontSize="16" FontWeight="SemiBold"/>
+        <!-- Main column: connection, playback, log -->
+        <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
 
-                <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Server" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerAddress}" PlaceholderText="ts.example.com or 127.0.0.1" IsEnabled="{Binding !IsConnected}"/>
+            <!-- Connection -->
+            <Border Grid.Row="0" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Grid.Column="0" Text="TeamSpeak Connection" FontSize="16" FontWeight="SemiBold"/>
+                        <Button Grid.Column="1" Content="{Binding SoundboardToggleLabel}" Command="{Binding ToggleSoundboardCommand}" Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="2" Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Opacity="0.8"/>
+                    </Grid>
 
-                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Nickname" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Nickname}" IsEnabled="{Binding !IsConnected}"/>
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Server" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerAddress}" PlaceholderText="ts.example.com or 127.0.0.1" IsEnabled="{Binding !IsConnected}"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ServerPassword}" PasswordChar="•" IsEnabled="{Binding !IsConnected}"/>
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Nickname" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Nickname}" IsEnabled="{Binding !IsConnected}"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Channel" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding Channel}" PlaceholderText="/1 or channel name" IsEnabled="{Binding !IsConnected}"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ServerPassword}" PasswordChar="•" IsEnabled="{Binding !IsConnected}"/>
 
-                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="8">
-                        <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
-                        <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding CanDisconnect}"/>
-                        <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.8"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="Channel" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding Channel}" PlaceholderText="/1 or channel name" IsEnabled="{Binding !IsConnected}"/>
 
-        <!-- Playback -->
-        <Border Grid.Row="1" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
-            <StackPanel Spacing="10">
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Grid.Column="0" Text="Playback" FontSize="16" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="1" Text="{Binding PlaybackStatus}" VerticalAlignment="Center" Opacity="0.8"/>
-                </Grid>
-
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                    <TextBlock Grid.Column="0" Text="Now playing" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="{Binding NowPlayingDisplay}" VerticalAlignment="Center" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                </Grid>
-
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                    <TextBlock Grid.Column="0" Text="{Binding ElapsedDisplay}" VerticalAlignment="Center" MinWidth="40" FontFamily="Consolas, Courier New, monospace"/>
-                    <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding ProgressValue}" Height="8" VerticalAlignment="Center" IsHitTestVisible="False"/>
-                    <TextBlock Grid.Column="2" Text="{Binding RemainingDisplay}" VerticalAlignment="Center" MinWidth="48" FontFamily="Consolas, Courier New, monospace"/>
-                </Grid>
-
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Button Grid.Column="0" Content="Browse…" Command="{Binding BrowseFileCommand}" IsEnabled="{Binding CanBrowse}"/>
-                    <TextBlock Grid.Column="1" Text="{Binding SelectedFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Opacity="0.85"/>
-                </Grid>
-
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Play" Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"/>
-                    <Button Content="Pause" Command="{Binding PauseCommand}" IsEnabled="{Binding CanPause}"/>
-                    <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"/>
-                    <Button Content="Previous" Command="{Binding SkipPreviousCommand}" IsEnabled="{Binding CanSkipPrevious}"/>
-                    <Button Content="Next" Command="{Binding SkipNextCommand}" IsEnabled="{Binding CanSkipNext}"/>
+                        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="8">
+                            <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
+                            <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding CanDisconnect}"/>
+                        </StackPanel>
+                    </Grid>
                 </StackPanel>
+            </Border>
 
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <TextBlock Grid.Column="0" Text="Music volume" VerticalAlignment="Center"/>
-                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Volume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
-                </Grid>
+            <!-- Playback -->
+            <Border Grid.Row="1" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="Playback" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1" Text="{Binding PlaybackStatus}" VerticalAlignment="Center" Opacity="0.8"/>
+                    </Grid>
 
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <TextBlock Grid.Column="0" Text="Master volume" VerticalAlignment="Center"/>
-                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding MasterVolume}" TickFrequency="10"/>
-                    <TextBlock Grid.Column="2" Text="{Binding MasterVolume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
-                </Grid>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" Text="Now playing" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding NowPlayingDisplay}" VerticalAlignment="Center" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    </Grid>
 
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <TextBlock Grid.Column="0" Text="Opus bitrate" VerticalAlignment="Center"/>
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{Binding OpusBitrateOptions}"
-                              SelectedItem="{Binding SelectedOpusBitrate}"
-                              HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Column="2" Text="{Binding OpusBitrateDisplay}" VerticalAlignment="Center" MinWidth="120" Opacity="0.85"/>
-                </Grid>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Text="{Binding ElapsedDisplay}" VerticalAlignment="Center" MinWidth="40" FontFamily="Consolas, Courier New, monospace"/>
+                        <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding ProgressValue}" Height="8" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                        <TextBlock Grid.Column="2" Text="{Binding RemainingDisplay}" VerticalAlignment="Center" MinWidth="48" FontFamily="Consolas, Courier New, monospace"/>
+                    </Grid>
 
-                <DockPanel LastChildFill="True" MinHeight="80">
-                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
-                        <TextBlock Text="Queue" VerticalAlignment="Center" Opacity="0.85"/>
-                        <Button Content="Remove" Command="{Binding RemoveSelectedQueueItemCommand}" IsEnabled="{Binding CanRemoveQueueItem}"/>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <Button Grid.Column="0" Content="Browse…" Command="{Binding BrowseFileCommand}" IsEnabled="{Binding CanBrowse}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding SelectedFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Opacity="0.85"/>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Play" Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"/>
+                        <Button Content="Pause" Command="{Binding PauseCommand}" IsEnabled="{Binding CanPause}"/>
+                        <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"/>
+                        <Button Content="Previous" Command="{Binding SkipPreviousCommand}" IsEnabled="{Binding CanSkipPrevious}"/>
+                        <Button Content="Next" Command="{Binding SkipNextCommand}" IsEnabled="{Binding CanSkipNext}"/>
                     </StackPanel>
-                    <ListBox ItemsSource="{Binding QueueItems}"
-                             SelectedItem="{Binding SelectedQueueItem}"
-                             MinHeight="72"
-                             DoubleTapped="QueueListBox_OnDoubleTapped">
+
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" Text="Music volume" VerticalAlignment="Center"/>
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Volume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" Text="Master volume" VerticalAlignment="Center"/>
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding MasterVolume}" TickFrequency="10"/>
+                        <TextBlock Grid.Column="2" Text="{Binding MasterVolume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" Text="Opus bitrate" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding OpusBitrateOptions}"
+                                  SelectedItem="{Binding SelectedOpusBitrate}"
+                                  HorizontalAlignment="Stretch"/>
+                        <TextBlock Grid.Column="2" Text="{Binding OpusBitrateDisplay}" VerticalAlignment="Center" MinWidth="120" Opacity="0.85"/>
+                    </Grid>
+
+                    <DockPanel LastChildFill="True" MinHeight="72">
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                            <TextBlock Text="Queue" VerticalAlignment="Center" Opacity="0.85"/>
+                            <Button Content="Remove" Command="{Binding RemoveSelectedQueueItemCommand}" IsEnabled="{Binding CanRemoveQueueItem}"/>
+                        </StackPanel>
+                        <ListBox ItemsSource="{Binding QueueItems}"
+                                 SelectedItem="{Binding SelectedQueueItem}"
+                                 MinHeight="64"
+                                 DoubleTapped="QueueListBox_OnDoubleTapped">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayText}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Log -->
+            <Border Grid.Row="2" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="Log" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <ListBox ItemsSource="{Binding LogEntries}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding DisplayText}" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding}" FontFamily="Consolas, Courier New, monospace" FontSize="12"/>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </DockPanel>
-            </StackPanel>
-        </Border>
+            </Border>
 
-        <!-- Log -->
-        <Border Grid.Row="2" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <TextBlock Grid.Row="3" Text="TS-DJ" Opacity="0.5" HorizontalAlignment="Right"/>
+        </Grid>
+
+        <!-- Soundboard sidebar (collapsible) -->
+        <Border Grid.Column="1" Width="360" Padding="12" CornerRadius="8" BorderThickness="1"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                IsVisible="{Binding IsSoundboardVisible}">
+            <Border DataContext="{Binding Soundboard}" x:DataType="vm:SoundboardViewModel">
             <DockPanel LastChildFill="True">
-                <TextBlock DockPanel.Dock="Top" Text="Log" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                <ListBox ItemsSource="{Binding LogEntries}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" FontFamily="Consolas, Courier New, monospace" FontSize="12"/>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </DockPanel>
-        </Border>
+                <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+                    <TextBlock Text="Soundboard" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="Press a key to bind hotkey (Esc to cancel)" Opacity="0.8"
+                               IsVisible="{Binding IsCapturingHotkey}"/>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Text="Volume" VerticalAlignment="Center"/>
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Volume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
+                    </Grid>
+                </StackPanel>
 
-        <TextBlock Grid.Row="3" Text="TS-DJ" Opacity="0.5" HorizontalAlignment="Right"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Pads}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="4" Columns="3"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SoundboardPadViewModel">
+                                <Border Margin="3" Padding="6" CornerRadius="6" BorderThickness="{Binding HighlightBorderThickness}"
+                                        BorderBrush="{DynamicResource SystemAccentColor}">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding FileNameDisplay}" FontSize="10" Opacity="0.75" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding HotkeyDisplay}" FontSize="9" Opacity="0.6"/>
+                                        <UniformGrid Columns="2" Margin="0,2,0,0">
+                                            <Button Content="▶" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).PlayPadCommand}"
+                                                    CommandParameter="{Binding}" IsEnabled="{Binding CanPlay}" Margin="1" Padding="4,2"/>
+                                            <Button Content="…" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).AssignPadCommand}"
+                                                    CommandParameter="{Binding}" Margin="1" Padding="4,2"/>
+                                            <Button Content="✕" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).ClearPadCommand}"
+                                                    CommandParameter="{Binding}" IsEnabled="{Binding HasFile}" Margin="1" Padding="4,2"/>
+                                            <Button Content="⌨" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).StartHotkeyCaptureCommand}"
+                                                    CommandParameter="{Binding}" Margin="1" Padding="4,2"/>
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+            </Border>
+        </Border>
     </Grid>
 </Window>

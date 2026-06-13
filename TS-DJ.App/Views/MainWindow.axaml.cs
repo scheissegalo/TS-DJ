@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
         await RestoreWindowSettingsAsync();
+        Focus();
     }
 
     protected override async void OnClosing(WindowClosingEventArgs e)
@@ -71,12 +72,22 @@ public partial class MainWindow : Window
             Height,
             Position.X,
             Position.Y,
-            state);
+            state,
+            DataContext is MainWindowViewModel vm && vm.IsSoundboardVisible);
     }
 
     private void QueueListBox_OnDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel && viewModel.PlaySelectedQueueItemCommand.CanExecute(null))
             viewModel.PlaySelectedQueueItemCommand.Execute(null);
+    }
+
+    private void MainWindow_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel mainVm)
+            return;
+
+        if (mainVm.Soundboard.TryHandleHotkey(e.Key, e.KeyModifiers))
+            e.Handled = true;
     }
 }

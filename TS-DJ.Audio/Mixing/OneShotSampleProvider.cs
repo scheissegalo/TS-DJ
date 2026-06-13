@@ -6,18 +6,15 @@ namespace TS_DJ.Audio.Mixing;
 
 /// <summary>
 /// One-shot sample provider that marks itself finished when the underlying stream ends.
+/// Cleanup must happen outside the mixer read path — NAudio removes zero-read inputs itself.
 /// </summary>
 internal sealed class OneShotSampleProvider : ISampleProvider
 {
     private readonly ISampleProvider _source;
-    private readonly Action<OneShotSampleProvider> _onFinished;
 
-    public OneShotSampleProvider(
-        ISampleProvider source,
-        Action<OneShotSampleProvider> onFinished)
+    public OneShotSampleProvider(ISampleProvider source)
     {
         _source = source;
-        _onFinished = onFinished;
         WaveFormat = source.WaveFormat;
     }
 
@@ -35,7 +32,6 @@ internal sealed class OneShotSampleProvider : ISampleProvider
             return read;
 
         IsFinished = true;
-        _onFinished(this);
         return 0;
     }
 }

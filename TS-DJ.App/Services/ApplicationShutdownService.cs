@@ -62,17 +62,20 @@ public sealed class ApplicationShutdownService
         double x,
         double y,
         string windowState,
+        bool isSoundboardVisible,
         CancellationToken cancellationToken = default)
     {
         try
         {
+            var existing = await LoadWindowSettingsAsync(cancellationToken);
             await _settingsService.SaveUiSettingsAsync(new UiSettings
             {
                 Width = width,
                 Height = height,
                 X = x,
                 Y = y,
-                WindowState = windowState
+                WindowState = windowState,
+                IsSoundboardVisible = isSoundboardVisible
             }, cancellationToken);
         }
         catch (Exception ex)
