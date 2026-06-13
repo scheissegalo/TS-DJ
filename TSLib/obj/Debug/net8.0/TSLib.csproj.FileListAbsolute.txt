@@ -1,0 +1,5 @@
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net8.0/TSLib.csproj.AssemblyReference.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net8.0/TSLib.GeneratedMSBuildEditorConfig.editorconfig
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net8.0/TSLib.AssemblyInfoInputs.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net8.0/TSLib.AssemblyInfo.cs
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Debug/net8.0/TSLib.csproj.CoreCompileInputs.cache

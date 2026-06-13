@@ -1,0 +1,17 @@
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/bin/Debug/net8.0/TS-DJ.TeamSpeak.deps.json
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/bin/Debug/net8.0/TS-DJ.TeamSpeak.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/bin/Debug/net8.0/TS-DJ.TeamSpeak.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/bin/Debug/net8.0/TS-DJ.Core.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/bin/Debug/net8.0/TSLib.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/bin/Debug/net8.0/TS-DJ.Core.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/bin/Debug/net8.0/TSLib.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.TeamSpeak.csproj.AssemblyReference.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.TeamSpeak.GeneratedMSBuildEditorConfig.editorconfig
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.TeamSpeak.AssemblyInfoInputs.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.TeamSpeak.AssemblyInfo.cs
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.TeamSpeak.csproj.CoreCompileInputs.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.Te.762A10C9.Up2Date
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.TeamSpeak.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/refint/TS-DJ.TeamSpeak.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/TS-DJ.TeamSpeak.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/Debug/net8.0/ref/TS-DJ.TeamSpeak.dll

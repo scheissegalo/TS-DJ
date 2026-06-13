@@ -1,0 +1,94 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TS_DJ.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="900"
+        d:DesignHeight="640"
+        x:Class="TS_DJ.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="TS-DJ"
+        Width="900"
+        Height="640"
+        MinWidth="720"
+        MinHeight="520">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="16" RowSpacing="12">
+
+        <!-- Connection -->
+        <Border Grid.Row="0" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="TeamSpeak Connection" FontSize="16" FontWeight="SemiBold"/>
+
+                <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Server" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerAddress}" PlaceholderText="ts.example.com or 127.0.0.1" IsEnabled="{Binding !IsConnected}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Nickname" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Nickname}" IsEnabled="{Binding !IsConnected}"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ServerPassword}" PasswordChar="•" IsEnabled="{Binding !IsConnected}"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Channel" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding Channel}" PlaceholderText="/1 or channel name" IsEnabled="{Binding !IsConnected}"/>
+
+                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
+                        <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding CanDisconnect}"/>
+                        <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.8"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Playback -->
+        <Border Grid.Row="1" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="Playback" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="{Binding PlaybackStatus}" VerticalAlignment="Center" Opacity="0.8"/>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Button Grid.Column="0" Content="Browse…" Command="{Binding BrowseFileCommand}" IsEnabled="{Binding CanBrowse}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding SelectedFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Opacity="0.85"/>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Play" Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"/>
+                    <Button Content="Pause" Command="{Binding PauseCommand}" IsEnabled="{Binding CanPause}"/>
+                    <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"/>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <TextBlock Grid.Column="0" Text="Volume" VerticalAlignment="Center"/>
+                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
+                    <TextBlock Grid.Column="2" Text="{Binding Volume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Log -->
+        <Border Grid.Row="2" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <DockPanel LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top" Text="Log" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <ListBox ItemsSource="{Binding LogEntries}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" FontFamily="Consolas, Courier New, monospace" FontSize="12"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <TextBlock Grid.Row="3" Text="TS-DJ — Phase 2" Opacity="0.5" HorizontalAlignment="Right"/>
+    </Grid>
+</Window>
