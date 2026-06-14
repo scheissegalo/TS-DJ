@@ -61,19 +61,32 @@ jobs:
           chmod +x packaging/release/assemble-linux.sh
           packaging/release/assemble-linux.sh "$VERSION" "publish/linux-x64" artifacts
 
+      - name: Prepare libopus (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          OPUS="$(ls /mingw64/bin/libopus*.dll 2>/dev/null | head -1)"
+          if [ -z "$OPUS" ]; then
+            echo "libopus DLL not found under /mingw64/bin"
+            find /mingw64 -name 'libopus*.dll' 2>/dev/null || true
+            exit 1
+          fi
+          echo "LIBOPUS_SOURCE=$(cygpath -m "$OPUS")" >> "$GITHUB_ENV"
+          echo "Using libopus: $OPUS"
+
       - name: Assemble Windows release zip
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $opus = Get-ChildItem -Path "C:\msys64\mingw64\bin" -Filter "*opus*.dll" |
-            Where-Object { $_.Name -match '^libopus' } |
-            Select-Object -First 1
-          if (-not $opus) { throw "libopus DLL not found in MSYS2" }
+          if (-not $env:LIBOPUS_SOURCE -or -not (Test-Path $env:LIBOPUS_SOURCE)) {
+            throw "libopus DLL path not set (LIBOPUS_SOURCE=$env:LIBOPUS_SOURCE)"
+          }
           & packaging/release/assemble-windows.ps1 `
             -Version $env:VERSION `
             -PublishDir "publish/win-x64" `
             -OutDir "artifacts" `
-            -LibOpusSource $opus.FullName
+            -LibOpusSource $env:LIBOPUS_SOURCE
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
