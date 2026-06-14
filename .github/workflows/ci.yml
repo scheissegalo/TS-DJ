@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install libopus (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libopus0
+
+      - name: Restore
+        run: dotnet restore TS-DJ.slnx
+
+      - name: Build
+        run: dotnet build TS-DJ.slnx -c Release --no-restore
+
+      - name: Build VerifySettings
+        run: dotnet build tools/VerifySettings/VerifySettings.csproj -c Release
+
+      - name: Run VerifySettings smoke test
+        run: dotnet run --project tools/VerifySettings/VerifySettings.csproj -c Release --no-build
+
+      - name: Publish (smoke)
+        run: >
+          dotnet publish TS-DJ.App/TS-DJ.App.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained false
+          -o publish/${{ matrix.rid }}

@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: linux-x64
+          - os: windows-latest
+            rid: win-x64
+            artifact: win-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Set version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "INFORMATIONAL_VERSION=${VERSION}+${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      - uses: msys2/setup-msys2@v2
+        if: matrix.os == 'windows-latest'
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-opus
+
+      - name: Publish
+        run: >
+          dotnet publish TS-DJ.App/TS-DJ.App.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained false
+          -o publish/${{ matrix.rid }}
+          -p:Version=${{ env.VERSION }}
+          -p:InformationalVersion=${{ env.INFORMATIONAL_VERSION }}
+
+      - name: Assemble Linux release zip
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          chmod +x packaging/release/assemble-linux.sh
+          packaging/release/assemble-linux.sh "$VERSION" "publish/linux-x64" artifacts
+
+      - name: Assemble Windows release zip
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $opus = Get-ChildItem -Path "C:\msys64\mingw64\bin" -Filter "*opus*.dll" |
+            Where-Object { $_.Name -match '^libopus' } |
+            Select-Object -First 1
+          if (-not $opus) { throw "libopus DLL not found in MSYS2" }
+          & packaging/release/assemble-windows.ps1 `
+            -Version $env:VERSION `
+            -PublishDir "publish/win-x64" `
+            -OutDir "artifacts" `
+            -LibOpusSource $opus.FullName
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-DJ-${{ env.VERSION }}-${{ matrix.artifact }}
+          path: artifacts/TS-DJ-${{ env.VERSION }}-${{ matrix.artifact }}.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: TS-DJ-${{ env.VERSION }}-*
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TS-DJ v${{ env.VERSION }}
+          generate_release_notes: true
+          files: |
+            artifacts/TS-DJ-${{ env.VERSION }}-linux-x64.zip
+            artifacts/TS-DJ-${{ env.VERSION }}-win-x64.zip

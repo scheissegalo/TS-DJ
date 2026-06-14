@@ -1,2 +1,8 @@
 <Solution>
+  <Project Path="TS-DJ.App/TS-DJ.App.csproj" />
+  <Project Path="TS-DJ.Core/TS-DJ.Core.csproj" />
+  <Project Path="TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj" />
+  <Project Path="TS-DJ.Audio/TS-DJ.Audio.csproj" />
+  <Project Path="TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj" />
+  <Project Path="TSLib/TSLib.csproj" />
 </Solution>

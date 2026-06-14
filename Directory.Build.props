@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.2.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+</Project>

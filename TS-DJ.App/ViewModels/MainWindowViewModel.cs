@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -110,6 +111,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _isSoundboardVisible = true;
 
     public string SoundboardToggleLabel => IsSoundboardVisible ? "Hide Soundboard" : "Show Soundboard";
+
+    public string ApplicationVersion { get; } =
+        typeof(MainWindowViewModel).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
+
+    public string WindowTitle => $"TS-DJ {ApplicationVersion}";
 
     public bool CanConnect => !IsConnected && !IsConnecting;
     public bool CanDisconnect => IsConnected;

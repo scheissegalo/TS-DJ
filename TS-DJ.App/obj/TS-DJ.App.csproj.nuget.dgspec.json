@@ -118,15 +118,10 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
-        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj": {
-      "version": "1.0.0",
+      "version": "0.2.0",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj",
         "projectName": "TS-DJ.Audio",
@@ -214,15 +209,10 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
-        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
-      "version": "1.0.0",
+      "version": "0.2.0",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
@@ -278,15 +268,10 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
-        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj": {
-      "version": "1.0.0",
+      "version": "0.2.0",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
         "projectName": "TS-DJ.Infrastructure",
@@ -368,15 +353,10 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
-        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj": {
-      "version": "1.0.0",
+      "version": "0.2.0",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
         "projectName": "TS-DJ.TeamSpeak",
@@ -444,11 +424,6 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
         }
       }
     },
@@ -541,11 +516,6 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/RuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
         }
       }
     }

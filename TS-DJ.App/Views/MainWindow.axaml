@@ -9,7 +9,7 @@
         x:Class="TS_DJ.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/ts-dj.ico"
-        Title="TS-DJ"
+        Title="{Binding WindowTitle}"
         Width="1100"
         Height="580"
         MinWidth="720"
@@ -188,7 +188,7 @@
                 </DockPanel>
             </Border>
 
-            <TextBlock Grid.Row="3" Text="TS-DJ" Opacity="0.5" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Row="3" Text="{Binding ApplicationVersion, StringFormat=TS-DJ {0}}" Opacity="0.5" HorizontalAlignment="Right"/>
         </Grid>
 
         <!-- Soundboard sidebar (collapsible) -->

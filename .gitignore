@@ -1,0 +1,18 @@
+## .NET
+bin/
+obj/
+publish/
+artifacts/
+*.user
+*.suo
+*.userprefs
+.vs/
+.idea/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Local / dev
+*.db
+*.log
