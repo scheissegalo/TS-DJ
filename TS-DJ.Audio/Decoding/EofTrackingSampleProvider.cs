@@ -15,6 +15,8 @@ internal sealed class EofTrackingSampleProvider : ISampleProvider
     private readonly long _expectedSamples;
     private bool _eof;
     private bool _eofPending;
+    private bool _decodeFailurePending;
+    private Exception? _lastReadException;
     private bool _hasDeliveredAudio;
     private bool _sourceExhausted;
     private int _postExhaustionReads;
@@ -55,14 +57,30 @@ internal sealed class EofTrackingSampleProvider : ISampleProvider
 
     public bool ConsumeEofPending()
     {
-        if (!_eofPending)
+        if (!_eofPending || _decodeFailurePending)
             return false;
 
         _eofPending = false;
         return true;
     }
 
+    public bool ConsumeDecodeFailurePending(out Exception? error)
+    {
+        error = null;
+        if (!_decodeFailurePending)
+            return false;
+
+        error = _lastReadException;
+        _decodeFailurePending = false;
+        _eofPending = false;
+        return true;
+    }
+
+    internal Exception? LastReadException => _lastReadException;
+
     internal void ForceEnd() => MarkEof();
+
+    internal void SignalDecodeFailure(Exception ex) => MarkDecodeFailure(ex);
 
     public int Read(float[] buffer, int offset, int count)
     {
@@ -72,7 +90,16 @@ internal sealed class EofTrackingSampleProvider : ISampleProvider
         if (!_sourceExhausted && IsSourceExhausted())
             _sourceExhausted = true;
 
-        var read = _resampled.Read(buffer, offset, count);
+        int read;
+        try
+        {
+            read = _resampled.Read(buffer, offset, count);
+        }
+        catch (Exception ex)
+        {
+            MarkDecodeFailure(ex);
+            return 0;
+        }
 
         if (read > 0)
         {
@@ -118,6 +145,13 @@ internal sealed class EofTrackingSampleProvider : ISampleProvider
     {
         _eof = true;
         _eofPending = true;
+    }
+
+    private void MarkDecodeFailure(Exception ex)
+    {
+        _eof = true;
+        _decodeFailurePending = true;
+        _lastReadException = ex;
     }
 
     private bool IsSourceExhausted()

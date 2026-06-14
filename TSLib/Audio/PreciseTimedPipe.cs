@@ -19,6 +19,7 @@ namespace TSLib.Audio
 
 		public IAudioPassiveProducer? InStream { get; set; }
 		public IAudioPassiveConsumer? OutStream { get; set; }
+		public Action<Exception>? OnReadException { get; set; }
 
 		public TimeSpan AudioBufferLength { get; set; } = TimeSpan.FromMilliseconds(20);
 		public TimeSpan SendCheckInterval { get; set; } = TimeSpan.FromMilliseconds(5);
@@ -86,6 +87,18 @@ namespace TSLib.Audio
 		}
 
 		private void ReadTick()
+		{
+			try
+			{
+				ReadTickCore();
+			}
+			catch (Exception ex)
+			{
+				OnReadException?.Invoke(ex);
+			}
+		}
+
+		private void ReadTickCore()
 		{
 			var inStream = InStream;
 			if (inStream is null)

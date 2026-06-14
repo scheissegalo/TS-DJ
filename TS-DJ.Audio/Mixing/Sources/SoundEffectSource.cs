@@ -88,7 +88,7 @@ public sealed class SoundEffectSource : ISoundEffectSource
         }
     }
 
-    public void Play(string filePath)
+    public void Play(string filePath, float gainFactor = 1f)
     {
         lock (_sync)
         {
@@ -108,20 +108,22 @@ public sealed class SoundEffectSource : ISoundEffectSource
             var cached = _clipCache?.Get(filePath);
             if (cached is not null)
             {
-                var provider = cached.CreateProvider();
+                ISampleProvider provider = cached.CreateProvider();
+                provider = ApplyGain(provider, gainFactor);
                 oneShot = new OneShotSampleProvider(provider);
-                _logger.LogDebug("Playing cached sound effect: {FilePath}", filePath);
+                _logger.LogDebug("Playing cached sound effect: {FilePath} (gain={GainFactor:F2})", filePath, gainFactor);
             }
             else
             {
                 var decoder = new AudioFileDecoder();
                 decoder.Open(filePath);
 
-                oneShot = new OneShotSampleProvider(decoder.Output)
+                ISampleProvider provider = ApplyGain(decoder.Output, gainFactor);
+                oneShot = new OneShotSampleProvider(provider)
                 {
                     Resource = decoder
                 };
-                _logger.LogDebug("Playing sound effect (file decode): {FilePath}", filePath);
+                _logger.LogDebug("Playing sound effect (file decode): {FilePath} (gain={GainFactor:F2})", filePath, gainFactor);
             }
 
             _effectMixer.AddMixerInput(oneShot);
@@ -131,6 +133,17 @@ public sealed class SoundEffectSource : ISoundEffectSource
                 "Sound effect added: {FilePath} (live={LiveCount}, attached={Attached})",
                 filePath, _activeEffects.Count(e => !e.IsFinished), _channel.IsAttached);
         }
+    }
+
+    private static ISampleProvider ApplyGain(ISampleProvider source, float gainFactor)
+    {
+        if (Math.Abs(gainFactor - 1f) < 0.0001f)
+            return source;
+
+        return new VolumeSampleProvider(source)
+        {
+            Volume = Math.Max(0f, gainFactor)
+        };
     }
 
     internal void TickCleanup()

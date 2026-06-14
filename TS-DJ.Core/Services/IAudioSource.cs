@@ -24,7 +24,7 @@ public interface IMusicTrackSource : IAudioSource
 
 public interface ISoundEffectSource : IAudioSource
 {
-    void Play(string filePath);
+    void Play(string filePath, float gainFactor = 1f);
 }
 
 public interface IMicrophoneSource : IAudioSource

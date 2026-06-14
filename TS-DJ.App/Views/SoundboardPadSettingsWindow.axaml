@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TS_DJ.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="420"
+        d:DesignHeight="480"
+        x:Class="TS_DJ.App.Views.SoundboardPadSettingsWindow"
+        x:DataType="vm:SoundboardPadSettingsViewModel"
+        Title="{Binding PadTitle}"
+        Width="420"
+        Height="480"
+        MinWidth="360"
+        MinHeight="420"
+        Focusable="True"
+        KeyDown="Window_OnKeyDown">
+
+    <Design.DataContext>
+        <vm:SoundboardPadSettingsViewModel/>
+    </Design.DataContext>
+
+    <StackPanel Margin="16" Spacing="12">
+
+        <TextBlock Text="Label" Opacity="0.85"/>
+        <TextBox Text="{Binding Label}" PlaceholderText="Pad label"/>
+
+        <TextBlock Text="Audio file" Opacity="0.85"/>
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Text="{Binding FileNameDisplay}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+            <Button Grid.Column="1" Content="Assign…" Command="{Binding AssignFileCommand}"/>
+            <Button Grid.Column="2" Content="Clear" Command="{Binding ClearPadCommand}" IsEnabled="{Binding HasFile}"/>
+        </Grid>
+
+        <TextBlock Text="Hotkey" Opacity="0.85"/>
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Text="{Binding HotkeyDisplay}" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="Capture" Command="{Binding StartHotkeyCaptureCommand}"/>
+            <Button Grid.Column="2" Content="Clear" Command="{Binding ClearHotkeyCommand}"/>
+        </Grid>
+        <TextBlock Text="Press a key to bind hotkey (Esc to cancel)" Opacity="0.7" FontSize="11"
+                   IsVisible="{Binding IsCapturingHotkey}"/>
+
+        <TextBlock Text="Gain" Opacity="0.85"/>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <Slider Grid.Column="0" Minimum="0" Maximum="300" Value="{Binding GainHuman}" TickFrequency="25"/>
+            <TextBlock Grid.Column="1" Text="{Binding GainHuman, StringFormat={}{0:0}%}" VerticalAlignment="Center" MinWidth="40"/>
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <Button Content="Preview" Command="{Binding PreviewCommand}" IsEnabled="{Binding CanPlay}"/>
+            <Button Content="Close" Click="CloseButton_OnClick"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

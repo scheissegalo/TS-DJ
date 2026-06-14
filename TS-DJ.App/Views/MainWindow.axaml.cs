@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using TS_DJ.App.Services;
 using TS_DJ.App.ViewModels;
@@ -11,11 +13,34 @@ public partial class MainWindow : Window
 {
     private readonly ApplicationShutdownService _shutdownService;
     private bool _isShuttingDown;
+    private MainWindowViewModel? _viewModel;
 
     public MainWindow()
     {
         InitializeComponent();
         _shutdownService = App.Services.GetRequiredService<ApplicationShutdownService>();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_viewModel is not null)
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+        _viewModel = DataContext as MainWindowViewModel;
+        if (_viewModel is not null)
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainWindowViewModel.CurrentlyPlayingItem))
+            return;
+
+        if (sender is not MainWindowViewModel vm || vm.CurrentlyPlayingItem is null)
+            return;
+
+        Dispatcher.UIThread.Post(() => QueueListBox.ScrollIntoView(vm.CurrentlyPlayingItem));
     }
 
     protected override async void OnOpened(EventArgs e)

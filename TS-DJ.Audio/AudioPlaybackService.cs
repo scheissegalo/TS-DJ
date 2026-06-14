@@ -192,6 +192,8 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
     public void RemoveFromQueue(int index) => _mixer.RemoveFromQueue(index);
 
+    public void ClearQueue() => _mixer.ClearQueue();
+
     private void OnNowPlayingChanged(object? sender, EventArgs e)
     {
         _logger.LogInformation(

@@ -22,6 +22,21 @@ public sealed class AudioFileDecoder : IDisposable
 
     public bool ConsumeEofPending() => _output?.ConsumeEofPending() ?? false;
 
+    public bool ConsumeDecodeFailurePending(out Exception? error)
+    {
+        if (_output is null)
+        {
+            error = null;
+            return false;
+        }
+
+        return _output.ConsumeDecodeFailurePending(out error);
+    }
+
+    internal void SignalDecodeFailure(Exception ex) => _output?.SignalDecodeFailure(ex);
+
+    internal Exception? LastReadException => _output?.LastReadException;
+
     internal void ForceEnd() => _output?.ForceEnd();
 
     public TimeSpan TotalTime

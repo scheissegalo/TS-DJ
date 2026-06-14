@@ -63,6 +63,7 @@ public sealed class AudioMixerService : IAudioMixerService
                     soundboard.TickCleanup();
             },
             Music.NotifyMixedRead,
+            OnMixerReadException,
             outputLogger);
 
         _pipeline = new AudioPipeline(pipelineId, logger);
@@ -135,7 +136,7 @@ public sealed class AudioMixerService : IAudioMixerService
         set => Soundboard.Volume = Math.Clamp(value, 0f, 1f);
     }
 
-    public void PlaySoundEffect(string filePath)
+    public void PlaySoundEffect(string filePath, float gainFactor = 1f)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Audio file not found.", filePath);
@@ -148,7 +149,7 @@ public sealed class AudioMixerService : IAudioMixerService
 
         lock (_sync)
         {
-            Soundboard.Play(filePath);
+            Soundboard.Play(filePath, gainFactor);
 
             var active = HasActiveAudioLocked();
             var transmitting = _pipeline.IsTransmitting;
@@ -368,7 +369,7 @@ public sealed class AudioMixerService : IAudioMixerService
                 _nowPlaying = null;
             }
 
-            if (!TryStartNextQueuedTrackLocked())
+            if (!TryAdvanceQueueLocked())
             {
                 if (Soundboard.IsActive)
                 {
@@ -537,7 +538,7 @@ public sealed class AudioMixerService : IAudioMixerService
                 return;
             }
 
-            if (!TryStartNextQueuedTrackLocked())
+            if (!TryAdvanceQueueLocked())
             {
                 _logger.LogWarning("Start requested but no queued tracks available");
                 return;
@@ -602,6 +603,74 @@ public sealed class AudioMixerService : IAudioMixerService
         RaiseQueueChanged();
     }
 
+    private void HandleTrackDecodeFailedLocked(Exception? error)
+    {
+        var failed = _nowPlaying;
+
+        if (failed is not null)
+        {
+            failed.Status = PlaybackQueueStatus.Failed;
+            _logger.LogWarning(
+                error,
+                "Track decode failed: {SourceKey} ({ExceptionType}) — marking Failed, attempting queue recovery",
+                failed.SourceKey,
+                error?.GetType().Name ?? "Unknown");
+        }
+
+        var queuedCount = _queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
+        _logger.LogInformation(
+            "Queue state after decode failure: queued={QueuedCount}, failed={FailedCount}, total={Total}",
+            queuedCount,
+            _queue.Count(i => i.Status == PlaybackQueueStatus.Failed),
+            _queue.Count);
+
+        if (queuedCount > 0)
+        {
+            _logger.LogInformation(
+                "Queue recovery after decode failure ({QueuedCount} queued item(s) remaining)",
+                queuedCount);
+
+            if (!TryAdvanceQueueLocked())
+            {
+                _logger.LogError(
+                    "Queue recovery exhausted after decode failure — queued={QueuedCount}, failed={FailedCount}",
+                    queuedCount,
+                    _queue.Count(i => i.Status == PlaybackQueueStatus.Failed));
+                _nowPlaying = null;
+                if (Soundboard.IsActive)
+                {
+                    if (!_pipeline.IsTransmitting)
+                        BeginTransmissionLocked(forSoundboardOnly: true);
+                }
+                else
+                    EnterIdleLocked("decode failure — queue recovery exhausted");
+            }
+            else
+            {
+                _pipeline.ResyncForNewTrack();
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked();
+                _logger.LogInformation(
+                    "Queue recovered after decode failure — now playing: {SourceKey}",
+                    _nowPlaying?.SourceKey ?? "none");
+            }
+        }
+        else
+        {
+            _nowPlaying = null;
+            if (Soundboard.IsActive)
+            {
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked(forSoundboardOnly: true);
+            }
+            else
+                EnterIdleLocked("decode failure — queue empty");
+        }
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+    }
+
     private void HandleTrackFinishedLocked()
     {
         PlaybackQueueItem? finished = _nowPlaying;
@@ -630,7 +699,7 @@ public sealed class AudioMixerService : IAudioMixerService
         {
             _logger.LogInformation("Queue advancing to next track ({QueuedCount} remaining in queue)", queuedCount);
 
-            if (!TryStartNextQueuedTrackLocked())
+            if (!TryAdvanceQueueLocked())
             {
                 _logger.LogError("Queue advance failed despite {QueuedCount} queued items — entering idle", queuedCount);
                 _nowPlaying = null;
@@ -667,41 +736,69 @@ public sealed class AudioMixerService : IAudioMixerService
         Music.NotifyTrackEndedEvent();
     }
 
-    private bool TryStartNextQueuedTrackLocked()
+    private bool TryAdvanceQueueLocked()
     {
-        var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
-        if (next is null)
+        var maxAttempts = Math.Max(_queue.Count, 1);
+        var skipped = 0;
+
+        while (skipped < maxAttempts)
         {
-            _logger.LogWarning("TryStartNextQueuedTrack: no item with Queued status");
-            return false;
+            var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+            if (next is null)
+            {
+                if (skipped > 0)
+                    _logger.LogWarning("TryAdvanceQueue: no playable items after skipping {Skipped} failed track(s)", skipped);
+                else
+                    _logger.LogWarning("TryAdvanceQueue: no item with Queued status");
+                return false;
+            }
+
+            foreach (var item in _queue)
+            {
+                if (item.Status == PlaybackQueueStatus.Playing)
+                    item.Status = PlaybackQueueStatus.Queued;
+            }
+
+            next.Status = PlaybackQueueStatus.Playing;
+            _nowPlaying = next;
+
+            try
+            {
+                OpenQueueItemLocked(next);
+                Music.Play();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to open/play queued track: {SourceKey} — skipping to next", next.SourceKey);
+                next.Status = PlaybackQueueStatus.Failed;
+                _nowPlaying = null;
+                skipped++;
+                continue;
+            }
+
+            if (skipped > 0)
+            {
+                _logger.LogInformation(
+                    "Queue auto-skipped {Skipped} failed track(s), now playing: {SourceKey}",
+                    skipped, next.SourceKey);
+            }
+
+            _logger.LogInformation(
+                "Now playing: {SourceKey} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
+                next.SourceKey, Music.IsPlaying, _pipeline.IsTransmitting);
+            return true;
         }
 
-        foreach (var item in _queue)
-        {
-            if (item.Status == PlaybackQueueStatus.Playing)
-                item.Status = PlaybackQueueStatus.Queued;
-        }
+        _logger.LogError(
+            "TryAdvanceQueue: gave up after {MaxAttempts} consecutive failures — mixer remains alive",
+            maxAttempts);
+        return false;
+    }
 
-        next.Status = PlaybackQueueStatus.Playing;
-        _nowPlaying = next;
-
-        try
-        {
-            OpenQueueItemLocked(next);
-            Music.Play();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to open/play queued track: {SourceKey}", next.SourceKey);
-            next.Status = PlaybackQueueStatus.Queued;
-            _nowPlaying = null;
-            return false;
-        }
-
-        _logger.LogInformation(
-            "Now playing: {SourceKey} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
-            next.SourceKey, Music.IsPlaying, _pipeline.IsTransmitting);
-        return true;
+    private void OnMixerReadException(Exception ex)
+    {
+        if (Music.IsOutputting)
+            Music.AbortTrackDueToDecodeError(ex);
     }
 
     private void BeginTransmissionLocked(bool forSoundboardOnly = false)
@@ -738,6 +835,16 @@ public sealed class AudioMixerService : IAudioMixerService
 
     private void ProcessLifecycleLocked()
     {
+        if (Music.TryConsumeTrackDecodeFailure(out var failedPath, out var decodeError))
+        {
+            _logger.LogWarning(
+                decodeError,
+                "ProcessLifecycle: decode failure consumed for {SourceKey} — mixer pipeline survives",
+                failedPath);
+            HandleTrackDecodeFailedLocked(decodeError);
+            return;
+        }
+
         if (Music.TryConsumeTrackEnd(out var finishedPath))
         {
             _logger.LogInformation("ProcessLifecycle: EOF consumed for {SourceKey}", finishedPath);

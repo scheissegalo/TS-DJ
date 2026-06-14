@@ -118,20 +118,33 @@
                             <Button Content="Clear" Command="{Binding ClearQueueCommand}" IsEnabled="{Binding CanClearQueue}"/>
                             <Button Content="Remove" Command="{Binding RemoveSelectedQueueItemCommand}" IsEnabled="{Binding CanRemoveQueueItem}"/>
                         </StackPanel>
-                        <ListBox ItemsSource="{Binding QueueItems}"
+                        <ListBox x:Name="QueueListBox"
+                                 ItemsSource="{Binding QueueItems}"
                                  SelectedItem="{Binding SelectedQueueItem}"
-                                 MaxHeight="140"
+                                 Height="180"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  DoubleTapped="QueueListBox_OnDoubleTapped">
+                            <ListBox.Styles>
+                                <Style Selector="Border.playing">
+                                    <Setter Property="Background" Value="#334285F4"/>
+                                    <Setter Property="CornerRadius" Value="4"/>
+                                    <Setter Property="Padding" Value="4,2"/>
+                                </Style>
+                                <Style Selector="Border.playing TextBlock">
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </ListBox.Styles>
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <VirtualizingStackPanel />
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding DisplayText}" TextTrimming="CharacterEllipsis"/>
+                                <DataTemplate x:DataType="vm:PlaybackQueueItemViewModel">
+                                    <Border Classes.playing="{Binding IsCurrentlyPlaying}">
+                                        <TextBlock Text="{Binding DisplayText}" TextTrimming="CharacterEllipsis"/>
+                                    </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -164,8 +177,6 @@
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
                     <TextBlock Text="Soundboard" FontSize="16" FontWeight="SemiBold"/>
-                    <TextBlock Text="Press a key to bind hotkey (Esc to cancel)" Opacity="0.8"
-                               IsVisible="{Binding IsCapturingHotkey}"/>
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                         <TextBlock Grid.Column="0" Text="Volume" VerticalAlignment="Center"/>
                         <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
@@ -191,11 +202,7 @@
                                         <UniformGrid Columns="2" Margin="0,2,0,0">
                                             <Button Content="▶" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).PlayPadCommand}"
                                                     CommandParameter="{Binding}" IsEnabled="{Binding CanPlay}" Margin="1" Padding="4,2"/>
-                                            <Button Content="…" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).AssignPadCommand}"
-                                                    CommandParameter="{Binding}" Margin="1" Padding="4,2"/>
-                                            <Button Content="✕" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).ClearPadCommand}"
-                                                    CommandParameter="{Binding}" IsEnabled="{Binding HasFile}" Margin="1" Padding="4,2"/>
-                                            <Button Content="⌨" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).StartHotkeyCaptureCommand}"
+                                            <Button Content="⚙" Command="{Binding $parent[ItemsControl].((vm:SoundboardViewModel)DataContext).OpenPadSettingsCommand}"
                                                     CommandParameter="{Binding}" Margin="1" Padding="4,2"/>
                                         </UniformGrid>
                                     </StackPanel>

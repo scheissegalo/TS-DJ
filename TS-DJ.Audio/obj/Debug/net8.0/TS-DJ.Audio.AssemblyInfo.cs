@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TS-DJ.Audio")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+09180407f71b2330a293cd0e35868a41a37954a7")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+873984cf4d5a5f1579317f1c1c5c3240d3dfe358")]
 [assembly: System.Reflection.AssemblyProductAttribute("TS-DJ.Audio")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TS-DJ.Audio")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

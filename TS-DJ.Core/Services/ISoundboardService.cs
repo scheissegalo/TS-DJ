@@ -17,6 +17,7 @@ public interface ISoundboardService
     void ClearPad(int index);
     void SetPadLabel(int index, string label);
     void SetPadHotkey(int index, string? hotkey);
+    void SetPadGain(int index, int gainHuman);
     void PlayPad(int index);
     int? FindPadByHotkey(string hotkey);
     Task PreloadPadAsync(int index, CancellationToken cancellationToken = default);

@@ -21,4 +21,5 @@ public interface IAudioPlaybackService
     Task SkipNextAsync(CancellationToken cancellationToken = default);
     Task SkipPreviousAsync(CancellationToken cancellationToken = default);
     void RemoveFromQueue(int index);
+    void ClearQueue();
 }

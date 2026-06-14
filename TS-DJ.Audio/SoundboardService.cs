@@ -101,10 +101,11 @@ public sealed class SoundboardService : ISoundboardService
         {
             var pad = _settings.Pads[index];
             previousPath = pad.FilePath;
+            var fileChanged = !string.Equals(pad.FilePath, filePath, StringComparison.OrdinalIgnoreCase);
             pad.FilePath = filePath;
             if (!string.IsNullOrWhiteSpace(label))
                 pad.Label = label;
-            else if (string.IsNullOrWhiteSpace(pad.Label) || pad.Label.StartsWith("Pad ", StringComparison.Ordinal))
+            else if (fileChanged || string.IsNullOrWhiteSpace(pad.Label) || pad.Label.StartsWith("Pad ", StringComparison.Ordinal))
                 pad.Label = Path.GetFileNameWithoutExtension(filePath);
         }
 
@@ -156,13 +157,27 @@ public sealed class SoundboardService : ISoundboardService
         PadsChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public void SetPadGain(int index, int gainHuman)
+    {
+        ValidateIndex(index);
+
+        lock (_sync)
+            _settings.Pads[index].GainHuman = Math.Clamp(gainHuman, 0, 300);
+
+        PadsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public void PlayPad(int index)
     {
         ValidateIndex(index);
 
         string? filePath;
+        int gainHuman;
         lock (_sync)
+        {
             filePath = _settings.Pads[index].FilePath;
+            gainHuman = _settings.Pads[index].GainHuman;
+        }
 
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -177,11 +192,12 @@ public sealed class SoundboardService : ISoundboardService
         }
 
         var path = filePath;
+        var gainFactor = gainHuman / 100f;
         Task.Run(() =>
         {
             try
             {
-                _mixer.PlaySoundEffect(path);
+                _mixer.PlaySoundEffect(path, gainFactor);
                 PadTriggered?.Invoke(this, index);
             }
             catch (Exception ex)
@@ -258,7 +274,8 @@ public sealed class SoundboardService : ISoundboardService
                 Index = p.Index,
                 Label = p.Label,
                 FilePath = p.FilePath,
-                Hotkey = p.Hotkey
+                Hotkey = p.Hotkey,
+                GainHuman = p.GainHuman
             }).ToList()
         };
 }

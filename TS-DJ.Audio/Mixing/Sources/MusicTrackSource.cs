@@ -188,6 +188,51 @@ public sealed class MusicTrackSource : IMusicTrackSource
         }
     }
 
+    /// <summary>
+    /// Returns true when a decode failure was signaled on the last mixed read tick.
+    /// Must be called from the mixer read path while holding the mixer lock.
+    /// </summary>
+    internal bool TryConsumeTrackDecodeFailure(out string? failedSourceKey, out Exception? error)
+    {
+        lock (_sync)
+        {
+            failedSourceKey = null;
+            error = null;
+
+            if (_decoder is null || !_decoder.ConsumeDecodeFailurePending(out error))
+                return false;
+
+            failedSourceKey = _currentSourceKey;
+            StopInternal(logStop: false);
+            _logger.LogWarning(
+                error,
+                "Music track decode failure: {SourceKey} ({ExceptionType}) — source removed, mixer survives",
+                failedSourceKey,
+                error?.GetType().Name ?? "Unknown");
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Layer-2 fallback when a read exception escapes the decode boundary.
+    /// Must be called while holding the mixer lock.
+    /// </summary>
+    internal void AbortTrackDueToDecodeError(Exception ex)
+    {
+        lock (_sync)
+        {
+            if (_decoder is null || !_gated.IsPlaying)
+                return;
+
+            _logger.LogWarning(
+                ex,
+                "Aborting track due to mixer read exception: {SourceKey} ({ExceptionType})",
+                _currentSourceKey,
+                ex.GetType().Name);
+            _decoder.SignalDecodeFailure(ex);
+        }
+    }
+
     internal void ForceTrackEnd()
     {
         lock (_sync)

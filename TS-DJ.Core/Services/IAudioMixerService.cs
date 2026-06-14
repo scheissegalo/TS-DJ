@@ -30,7 +30,7 @@ public interface IAudioMixerService : IDisposable
     void Pause();
     void Stop();
 
-    void PlaySoundEffect(string filePath);
+    void PlaySoundEffect(string filePath, float gainFactor = 1f);
 
     float SoundboardVolume { get; set; }
 

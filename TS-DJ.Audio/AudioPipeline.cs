@@ -31,6 +31,8 @@ public sealed class AudioPipeline : IDisposable
         VolumePipe = new VolumePipe();
         EncoderPipe = new EncoderPipe(SendCodec) { Bitrate = OpusBitratePresets.Default * 1000 };
         TimePipe = new PreciseTimedPipe(EncoderPipe, id) { ReadBufferSize = EncoderPipe.PacketSize };
+        TimePipe.OnReadException = ex =>
+            _logger?.LogError(ex, "PreciseTimedPipe read thread exception — thread survives, paused={Paused}", TimePipe.Paused);
 
         TimePipe.Chain(CheckActivePipe).Chain(VolumePipe).Chain(EncoderPipe);
     }

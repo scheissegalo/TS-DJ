@@ -19,6 +19,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
     private readonly Action _processLifecycle;
     private readonly Action? _afterRead;
     private readonly Action<int>? _onMixedRead;
+    private readonly Action<Exception>? _onReadException;
     private readonly ILogger<MixerOutputProducer>? _logger;
     private byte[] _readBuffer = Array.Empty<byte>();
     private long _readCount;
@@ -33,6 +34,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
         Action processLifecycle,
         Action? afterRead = null,
         Action<int>? onMixedRead = null,
+        Action<Exception>? onReadException = null,
         ILogger<MixerOutputProducer>? logger = null)
     {
         _mixer = mixer;
@@ -41,6 +43,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
         _processLifecycle = processLifecycle;
         _afterRead = afterRead;
         _onMixedRead = onMixedRead;
+        _onReadException = onReadException;
         _logger = logger;
         _waveProvider = mixer.ToWaveProvider16();
     }
@@ -106,8 +109,14 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "MixerOutputProducer: exception during read #{ReadCount}", _readCount);
-                throw;
+                _logger?.LogError(
+                    ex,
+                    "MixerOutputProducer: exception during read #{ReadCount} — isolating failure, returning 0 (mixer survives)",
+                    _readCount);
+                _onReadException?.Invoke(ex);
+                _afterRead?.Invoke();
+                _processLifecycle();
+                return 0;
             }
         }
     }

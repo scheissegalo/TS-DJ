@@ -95,6 +95,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private PlaybackQueueItemViewModel? _selectedQueueItem;
 
     [ObservableProperty]
+    private PlaybackQueueItemViewModel? _currentlyPlayingItem;
+
+    [ObservableProperty]
     private bool _isSoundboardVisible = true;
 
     public string SoundboardToggleLabel => IsSoundboardVisible ? "Hide Soundboard" : "Show Soundboard";
@@ -382,7 +385,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ClearQueue()
     {
-        _audioMixerService.ClearQueue();
+        _audioPlaybackService.ClearQueue();
         SelectedQueueItem = null;
         NotifyCommandStatesChanged();
     }
@@ -563,26 +566,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         HasQueueItems = queue.Any(item =>
             item.Status is PlaybackQueueStatus.Queued or PlaybackQueueStatus.Playing);
 
-        for (var i = 0; i < queue.Count; i++)
-        {
-            if (i < QueueItems.Count)
-            {
-                QueueItems[i].Update(queue[i]);
-            }
-            else
-            {
-                QueueItems.Add(new PlaybackQueueItemViewModel(queue[i]));
-            }
-        }
+        var selectedKey = SelectedQueueItem?.SourceKey;
 
-        while (QueueItems.Count > queue.Count)
-            QueueItems.RemoveAt(QueueItems.Count - 1);
+        QueueItems.Clear();
+        foreach (var item in queue)
+            QueueItems.Add(new PlaybackQueueItemViewModel(item));
 
-        if (SelectedQueueItem is not null &&
-            !QueueItems.Contains(SelectedQueueItem))
-        {
-            SelectedQueueItem = null;
-        }
+        SelectedQueueItem = selectedKey is null
+            ? null
+            : QueueItems.FirstOrDefault(i => i.SourceKey == selectedKey);
+
+        CurrentlyPlayingItem = QueueItems.FirstOrDefault(i => i.IsCurrentlyPlaying);
     }
 
     private void UpdateNowPlayingDisplay()

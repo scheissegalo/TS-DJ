@@ -4,8 +4,10 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using TS_DJ.App.Views;
 using TS_DJ.Audio;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
@@ -90,7 +92,6 @@ public partial class SoundboardViewModel : ViewModelBase, IDisposable
 
             var hotkey = HotkeyFormatter.Format(key, modifiers);
             _soundboardService.SetPadHotkey(captureIndex, hotkey);
-            Pads[captureIndex].Hotkey = hotkey;
             CapturingHotkeyPadIndex = null;
             ScheduleSave();
             return true;
@@ -159,6 +160,34 @@ public partial class SoundboardViewModel : ViewModelBase, IDisposable
         CapturingHotkeyPadIndex = pad.Index;
     }
 
+    [RelayCommand]
+    private void OpenPadSettings(SoundboardPadViewModel? pad)
+    {
+        if (pad is null)
+            return;
+
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+        var logger = App.Services.GetRequiredService<ILogger<SoundboardPadSettingsViewModel>>();
+        var viewModel = new SoundboardPadSettingsViewModel(
+            logger,
+            _soundboardService,
+            _teamSpeakService,
+            pad.Index);
+
+        var window = new SoundboardPadSettingsWindow
+        {
+            DataContext = viewModel
+        };
+
+        if (desktop.MainWindow is Window owner)
+            window.Show(owner);
+        else
+            window.Show();
+    }
+
     partial void OnCapturingHotkeyPadIndexChanged(int? value) =>
         OnPropertyChanged(nameof(IsCapturingHotkey));
 
@@ -191,6 +220,7 @@ public partial class SoundboardViewModel : ViewModelBase, IDisposable
             vm.Label = padModel.Label;
             vm.FilePath = padModel.FilePath;
             vm.Hotkey = padModel.Hotkey;
+            vm.GainHuman = padModel.GainHuman;
             vm.IsConnected = IsConnected;
         }
     }

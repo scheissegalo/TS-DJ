@@ -17,6 +17,9 @@ public partial class SoundboardPadViewModel : ViewModelBase
     private string? _hotkey;
 
     [ObservableProperty]
+    private int _gainHuman = 100;
+
+    [ObservableProperty]
     private bool _isTriggered;
 
     [ObservableProperty]
