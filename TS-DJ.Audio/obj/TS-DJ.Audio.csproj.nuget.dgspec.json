@@ -93,6 +93,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
@@ -151,6 +156,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     },
@@ -223,6 +233,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     },
@@ -315,6 +330,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     }

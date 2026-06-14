@@ -11,3 +11,16 @@
 /media/berni/FatExt2TB/clones/KBTS3AudioBot/TSLib/obj/Release/net6.0/refint/TSLib.dll
 /media/berni/FatExt2TB/clones/KBTS3AudioBot/TSLib/obj/Release/net6.0/TSLib.pdb
 /media/berni/FatExt2TB/clones/KBTS3AudioBot/TSLib/obj/Release/net6.0/ref/TSLib.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/bin/Release/net6.0/TSLib.deps.json
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/bin/Release/net6.0/TSLib.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/bin/Release/net6.0/TSLib.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.csproj.AssemblyReference.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.GeneratedMSBuildEditorConfig.editorconfig
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.AssemblyInfoInputs.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.AssemblyInfo.cs
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.csproj.CoreCompileInputs.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.sourcelink.json
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/refint/TSLib.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/TSLib.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/Release/net6.0/ref/TSLib.dll

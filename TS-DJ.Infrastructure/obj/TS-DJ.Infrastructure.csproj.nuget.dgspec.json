@@ -61,6 +61,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj": {
@@ -145,6 +150,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     }

@@ -1,0 +1,16 @@
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/bin/Release/net8.0/TS-DJ.Infrastructure.deps.json
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/bin/Release/net8.0/TS-DJ.Infrastructure.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/bin/Release/net8.0/TS-DJ.Infrastructure.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/bin/Release/net8.0/TS-DJ.Core.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/bin/Release/net8.0/TS-DJ.Core.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.csproj.AssemblyReference.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.AssemblyInfoInputs.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.AssemblyInfo.cs
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.csproj.CoreCompileInputs.cache
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.sourcelink.json
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.In.48952678.Up2Date
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/refint/TS-DJ.Infrastructure.dll
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/TS-DJ.Infrastructure.pdb
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/Release/net8.0/ref/TS-DJ.Infrastructure.dll

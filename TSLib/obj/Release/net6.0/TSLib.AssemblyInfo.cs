@@ -13,10 +13,10 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TSLib")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyCopyrightAttribute("Splamy, Flakebi, TSLib Contributors")]
-[assembly: System.Reflection.AssemblyDescriptionAttribute("\n      A free and open source TeamSpeak 3 and 5 client library.\n      Can connect" +
-    " as normal voice or query client and is optimized for performance.\n    ")]
+[assembly: System.Reflection.AssemblyDescriptionAttribute(("\n      A free and open source TeamSpeak 3 and 5 client library.\n      Can connect" +
+    " as normal voice or query client and is optimized for performance.\n    "))]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+2cc7792cac700dc9fc022f70cadd39efac45b8ac")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+c5aa99645c3951606d24365222df23e7a092110e")]
 [assembly: System.Reflection.AssemblyProductAttribute("TSLib")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TSLib")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.1.0.0")]

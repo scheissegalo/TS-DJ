@@ -11,6 +11,7 @@ using TS_DJ.Core.Services;
 using TS_DJ.Audio.DependencyInjection;
 using TS_DJ.Infrastructure.DependencyInjection;
 using TS_DJ.Infrastructure.Logging;
+using TS_DJ.TeamSpeak;
 using TS_DJ.TeamSpeak.DependencyInjection;
 
 namespace TS_DJ.App;
@@ -53,6 +54,7 @@ public partial class App : Application
 
         var logService = _host.Services.GetRequiredService<Core.Services.ILogService>();
         _host.Services.GetRequiredService<ILoggerFactory>().AddProvider(new UiLogProvider(logService));
+        _ = _host.Services.GetRequiredService<TeamSpeakDescriptionService>();
 
         var appLogger = _host.Services.GetRequiredService<ILogger<App>>();
         if (TSLib.Audio.Opus.NativeMethods.PreloadLibrary())

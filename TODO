@@ -1,5 +1,8 @@
 Stream Audio Input
-Make current channel default
-Title, Artist album etc into description.
-auto scroll queue list to active playing item on track change.
-create a desktop file for easy start
+2Deck DJ and Playlist mode switch
+Actions for github to autobuild the project and publish (might need to add versioning and add tags for that) for linux and windows (if possible)
+update Readme
+
+
+Issues:
+Log does not auto scroll to last entry

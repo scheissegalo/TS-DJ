@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=TS-DJ
+GenericName=TeamSpeak DJ Client
+Comment=Stream music into a TeamSpeak channel
+Exec=TS-DJ.App
+Path=/usr/local/share/ts-dj
+Icon=ts-dj
+Terminal=false
+Categories=AudioVideo;
+StartupNotify=true

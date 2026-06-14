@@ -5,7 +5,7 @@
   },
   "projects": {
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj": {
-      "version": "1.0.0",
+      "version": "0.2.0",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
         "projectName": "TS-DJ.App",
@@ -74,6 +74,8 @@
               "version": "[12.0.4, )"
             },
             "AvaloniaUI.DiagnosticsSupport": {
+              "include": "None",
+              "suppressParent": "All",
               "target": "Package",
               "version": "[2.2.1, )"
             },
@@ -115,6 +117,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     },
@@ -207,6 +214,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
@@ -265,6 +277,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     },
@@ -351,6 +368,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj": {
@@ -422,6 +444,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     },
@@ -514,6 +541,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     }

@@ -14,6 +14,7 @@ public sealed class ApplicationShutdownService
     private readonly IAudioPlaybackService _audioPlaybackService;
     private readonly ITeamSpeakService _teamSpeakService;
     private readonly TeamSpeakNicknameService _nicknameService;
+    private readonly TeamSpeakDescriptionService _descriptionService;
     private readonly ISettingsService _settingsService;
     private readonly MainWindowViewModel _mainWindowViewModel;
 
@@ -24,6 +25,7 @@ public sealed class ApplicationShutdownService
         IAudioPlaybackService audioPlaybackService,
         ITeamSpeakService teamSpeakService,
         TeamSpeakNicknameService nicknameService,
+        TeamSpeakDescriptionService descriptionService,
         ISettingsService settingsService,
         MainWindowViewModel mainWindowViewModel)
     {
@@ -31,6 +33,7 @@ public sealed class ApplicationShutdownService
         _audioPlaybackService = audioPlaybackService;
         _teamSpeakService = teamSpeakService;
         _nicknameService = nicknameService;
+        _descriptionService = descriptionService;
         _settingsService = settingsService;
         _mainWindowViewModel = mainWindowViewModel;
     }
@@ -47,6 +50,7 @@ public sealed class ApplicationShutdownService
         _logger.LogInformation("Application shutdown started");
 
         await RunStepAsync("save settings", () => _mainWindowViewModel.SaveSettingsForShutdownAsync(token), token);
+        await RunStepAsync("clear description", () => _descriptionService.ClearDescriptionAsync(token), token);
         await RunStepAsync("restore nickname", () => _nicknameService.RestoreBaseNicknameAsync(token), token);
         await RunStepAsync("stop playback", () => _audioPlaybackService.StopAsync(token), token);
 

@@ -27,6 +27,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private CancellationTokenSource? _volumeSaveDebounceCts;
     private bool _isLoadingSettings;
     private bool _disposed;
+    private string? _lastPlayingSourceKeyForScroll;
 
     [ObservableProperty]
     private string _serverAddress = string.Empty;
@@ -39,6 +40,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _channel = string.Empty;
+
+    [ObservableProperty]
+    private TeamSpeakChannelInfo? _selectedChannel;
+
+    [ObservableProperty]
+    private bool _showEmptyChannels;
+
+    private bool _isSyncingChannelSelection;
 
     [ObservableProperty]
     private string _connectionStatus = "● Disconnected";
@@ -120,6 +129,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioMixerService.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
 
     public ObservableCollection<LogEntry> LogEntries { get; } = [];
+
+    public ObservableCollection<TeamSpeakChannelInfo> AvailableChannels { get; } = [];
+
+    public event EventHandler<LogEntry>? LogEntryAppended;
+    public event EventHandler<PlaybackQueueItemViewModel?>? QueueScrollTargetChanged;
     public ObservableCollection<PlaybackQueueItemViewModel> QueueItems { get; } = [];
     public ObservableCollection<OpusBitrateOption> OpusBitrateOptions { get; } =
     [
@@ -152,6 +166,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         _teamSpeakService.StateChanged += OnConnectionStateChanged;
         _teamSpeakService.StatusMessage += OnStatusMessage;
+        _teamSpeakService.ChannelsUpdated += OnChannelsUpdated;
+        _teamSpeakService.CurrentChannelChanged += OnCurrentChannelChanged;
         _audioPlaybackService.StateChanged += OnPlaybackStateChanged;
         _audioMixerService.QueueChanged += OnQueueChanged;
         _audioMixerService.NowPlayingChanged += OnNowPlayingChanged;
@@ -228,6 +244,138 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             LogError("Failed to save settings during shutdown", ex);
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(IsConnected))]
+    private async Task RefreshChannelsAsync()
+    {
+        try
+        {
+            var channels = await _teamSpeakService.GetChannelsAsync(ShowEmptyChannels);
+            ApplyAvailableChannels(channels);
+            SyncSelectedChannelFromCurrent();
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to refresh channels", ex);
+        }
+    }
+
+    partial void OnShowEmptyChannelsChanged(bool value)
+    {
+        if (!IsConnected)
+            return;
+
+        _ = RefreshChannelsAsync();
+    }
+
+    partial void OnSelectedChannelChanged(TeamSpeakChannelInfo? value)
+    {
+        if (_isSyncingChannelSelection || value is null)
+            return;
+
+        Channel = value.Id;
+
+        if (!IsConnected)
+            return;
+
+        _ = MoveToSelectedChannelAsync(value);
+    }
+
+    private async Task MoveToSelectedChannelAsync(TeamSpeakChannelInfo channel)
+    {
+        try
+        {
+            await _teamSpeakService.MoveToChannelAsync(channel.Id);
+            await PersistChannelSettingsAsync();
+        }
+        catch (Exception ex)
+        {
+            LogError($"Failed to move to channel {channel.DisplayPath}", ex);
+        }
+    }
+
+    private async Task PersistChannelSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _settingsService.SaveConnectionSettingsAsync(new ConnectionSettings
+            {
+                Address = ServerAddress,
+                Nickname = Nickname,
+                ServerPassword = ServerPassword,
+                Channel = Channel
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to save channel settings", ex);
+        }
+    }
+
+    private void ApplyAvailableChannels(IReadOnlyList<TeamSpeakChannelInfo> channels)
+    {
+        AvailableChannels.Clear();
+        foreach (var channel in channels)
+            AvailableChannels.Add(channel);
+    }
+
+    private void SyncSelectedChannelFromCurrent()
+    {
+        var current = _teamSpeakService.GetCurrentChannel();
+        if (current is null)
+            return;
+
+        _isSyncingChannelSelection = true;
+        try
+        {
+            SelectedChannel = AvailableChannels.FirstOrDefault(c => c.Id == current.Id)
+                ?? AvailableChannels.FirstOrDefault(c =>
+                    string.Equals(c.DisplayPath, current.DisplayPath, StringComparison.OrdinalIgnoreCase))
+                ?? current;
+            Channel = current.Id;
+        }
+        finally
+        {
+            _isSyncingChannelSelection = false;
+        }
+    }
+
+    private void OnChannelsUpdated(object? sender, IReadOnlyList<TeamSpeakChannelInfo> channels)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            ApplyAvailableChannels(channels);
+            SyncSelectedChannelFromCurrent();
+        });
+    }
+
+    private void OnCurrentChannelChanged(object? sender, TeamSpeakChannelInfo info)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _isSyncingChannelSelection = true;
+            try
+            {
+                Channel = info.Id;
+                var match = AvailableChannels.FirstOrDefault(c => c.Id == info.Id);
+                if (match is not null)
+                {
+                    SelectedChannel = match;
+                }
+                else
+                {
+                    AvailableChannels.Add(info);
+                    SelectedChannel = info;
+                }
+            }
+            finally
+            {
+                _isSyncingChannelSelection = false;
+            }
+
+            _ = PersistChannelSettingsAsync();
+        });
     }
 
     [RelayCommand]
@@ -434,7 +582,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnSelectedQueueItemChanged(PlaybackQueueItemViewModel? value) =>
         NotifyCommandStatesChanged();
 
-    partial void OnIsConnectedChanged(bool value) => NotifyCommandStatesChanged();
+    partial void OnIsConnectedChanged(bool value)
+    {
+        RefreshChannelsCommand.NotifyCanExecuteChanged();
+        NotifyCommandStatesChanged();
+    }
     partial void OnIsConnectingChanged(bool value) => NotifyCommandStatesChanged();
     partial void OnIsPlayingChanged(bool value)
     {
@@ -509,7 +661,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _nicknameService.SetBaseNickname(Nickname);
                 _ = _nicknameService.ApplyInitialStatusAsync();
             }
+            else if (state == ConnectionState.Disconnected || state == ConnectionState.Error)
+            {
+                AvailableChannels.Clear();
+                SelectedChannel = null;
+            }
 
+            RefreshChannelsCommand.NotifyCanExecuteChanged();
             NotifyCommandStatesChanged();
         });
     }
@@ -576,7 +734,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ? null
             : QueueItems.FirstOrDefault(i => i.SourceKey == selectedKey);
 
-        CurrentlyPlayingItem = QueueItems.FirstOrDefault(i => i.IsCurrentlyPlaying);
+        var playing = QueueItems.FirstOrDefault(i => i.IsCurrentlyPlaying);
+        var playingKey = playing?.SourceKey;
+
+        if (playingKey != _lastPlayingSourceKeyForScroll)
+        {
+            _lastPlayingSourceKeyForScroll = playingKey;
+            CurrentlyPlayingItem = playing;
+            _logger.LogDebug("Queue scroll target changed to {SourceKey}", playingKey ?? "none");
+            QueueScrollTargetChanged?.Invoke(this, playing);
+        }
     }
 
     private void UpdateNowPlayingDisplay()
@@ -640,7 +807,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnLogEntryAdded(object? sender, LogEntry entry)
     {
-        Dispatcher.UIThread.Post(() => LogEntries.Add(entry));
+        Dispatcher.UIThread.Post(() =>
+        {
+            LogEntries.Add(entry);
+            LogEntryAppended?.Invoke(this, entry);
+        });
     }
 
     private void NotifyCommandStatesChanged()
@@ -683,6 +854,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         _teamSpeakService.StateChanged -= OnConnectionStateChanged;
         _teamSpeakService.StatusMessage -= OnStatusMessage;
+        _teamSpeakService.ChannelsUpdated -= OnChannelsUpdated;
+        _teamSpeakService.CurrentChannelChanged -= OnCurrentChannelChanged;
         _audioPlaybackService.StateChanged -= OnPlaybackStateChanged;
         _audioMixerService.QueueChanged -= OnQueueChanged;
         _audioMixerService.NowPlayingChanged -= OnNowPlayingChanged;

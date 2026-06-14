@@ -23,6 +23,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
     private readonly Ts3VoiceTarget _voiceTarget;
     private ConnectionState _state = ConnectionState.Disconnected;
     private bool _closed;
+    private TeamSpeakChannelInfo? _currentChannel;
 
     public TeamSpeakService(
         ILogger<TeamSpeakService> logger,
@@ -38,12 +39,15 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
         _client = new TsFullClient(_scheduler);
         _voiceTarget = new Ts3VoiceTarget(_client, logger);
         _client.OnDisconnected += OnClientDisconnected;
+        _client.OnEachClientMoved += OnClientMoved;
     }
 
     public ConnectionState State => _state;
 
     public event EventHandler<ConnectionState>? StateChanged;
     public event EventHandler<string>? StatusMessage;
+    public event EventHandler<TeamSpeakChannelInfo>? CurrentChannelChanged;
+    public event EventHandler<IReadOnlyList<TeamSpeakChannelInfo>>? ChannelsUpdated;
 
     public Ts3VoiceTarget VoiceTarget => _voiceTarget;
 
@@ -86,12 +90,15 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
             }
 
             var self = _client.Book.Self();
+            UpdateCurrentChannelFromBook();
             _logger.LogInformation(
                 "Connected as {Nickname} in channel {Channel}",
                 settings.Nickname,
-                self?.Channel.ToString() ?? settings.Channel);
+                _currentChannel?.DisplayPath ?? self?.Channel.ToString() ?? settings.Channel);
             SetState(ConnectionState.Connected);
-            RaiseStatus($"Connected — channel {self?.Channel.ToString() ?? settings.Channel}");
+            RaiseStatus($"Connected — channel {_currentChannel?.DisplayPath ?? settings.Channel}");
+
+            _ = RefreshAndPublishChannelsAsync(includeEmpty: false);
         }
         catch (Exception ex)
         {
@@ -109,6 +116,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
 
         await _scheduler.InvokeAsync(_client.Disconnect);
 
+        _currentChannel = null;
         SetState(ConnectionState.Disconnected);
         RaiseStatus("Disconnected");
         _logger.LogInformation("Disconnected");
@@ -129,6 +137,126 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
         _logger.LogDebug("Nickname changed to {Nickname}", nickname);
     }
 
+    public async Task SetDescriptionAsync(string description, CancellationToken cancellationToken = default)
+    {
+        if (_state != ConnectionState.Connected)
+        {
+            _logger.LogDebug("SetDescription ignored — not connected");
+            return;
+        }
+
+        var trimmed = description.Length > TeamSpeakDescriptionFormatter.MaxDescriptionLength
+            ? description[..TeamSpeakDescriptionFormatter.MaxDescriptionLength]
+            : description;
+
+        await _scheduler.InvokeAsync(() => _client.ChangeDescription(trimmed));
+        _logger.LogDebug("Client description updated ({Length} chars)", trimmed.Length);
+    }
+
+    public async Task<IReadOnlyList<TeamSpeakChannelInfo>> GetChannelsAsync(
+        bool includeEmpty,
+        CancellationToken cancellationToken = default)
+    {
+        if (_state != ConnectionState.Connected)
+            return Array.Empty<TeamSpeakChannelInfo>();
+
+        return await _scheduler.InvokeAsync(() => QueryChannelsAsync(includeEmpty));
+    }
+
+    public async Task MoveToChannelAsync(string channelId, CancellationToken cancellationToken = default)
+    {
+        if (_state != ConnectionState.Connected)
+            throw new InvalidOperationException("Not connected to TeamSpeak.");
+
+        var parsed = TeamSpeakChannelMapper.ParseChannelId(channelId);
+        var result = await _scheduler.InvokeAsync(() =>
+            _client.ClientMove(_client.Book.OwnClient, parsed));
+
+        if (!result.GetOk(out var error))
+        {
+            _logger.LogWarning("ClientMove to {ChannelId} failed: {Error}", channelId, error.ErrorFormat());
+            throw new InvalidOperationException(error.Message);
+        }
+
+        UpdateCurrentChannelFromBook();
+        _logger.LogInformation("Moved to channel {Channel}", _currentChannel?.DisplayPath ?? channelId);
+    }
+
+    public TeamSpeakChannelInfo? GetCurrentChannel() => _currentChannel;
+
+    private async Task<IReadOnlyList<TeamSpeakChannelInfo>> QueryChannelsAsync(bool includeEmpty)
+    {
+        var listResult = await _client.ChannelList();
+        if (!listResult.Get(out var responses, out var error))
+        {
+            _logger.LogWarning("ChannelList failed: {Error}", error.ErrorFormat());
+            return Array.Empty<TeamSpeakChannelInfo>();
+        }
+
+        var bookChannels = _client.Book.Channels;
+        var currentId = _client.Book.CurrentChannel()?.Id;
+        var channels = new List<TeamSpeakChannelInfo>();
+
+        foreach (var response in responses)
+        {
+            if (!includeEmpty && response.TotalClients <= 0 && response.ChannelId != currentId)
+                continue;
+
+            channels.Add(TeamSpeakChannelMapper.ToInfo(
+                response.ChannelId,
+                response.Name,
+                bookChannels,
+                response.TotalClients));
+        }
+
+        channels.Sort((a, b) => string.Compare(a.DisplayPath, b.DisplayPath, StringComparison.OrdinalIgnoreCase));
+        return channels;
+    }
+
+    private async Task RefreshAndPublishChannelsAsync(bool includeEmpty)
+    {
+        try
+        {
+            var channels = await GetChannelsAsync(includeEmpty);
+            ChannelsUpdated?.Invoke(this, channels);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to refresh channel list");
+        }
+    }
+
+    private void UpdateCurrentChannelFromBook()
+    {
+        var channel = _client.Book.CurrentChannel();
+        var info = TeamSpeakChannelMapper.FromCurrentChannel(channel, _client.Book.Channels);
+        if (info is null)
+            return;
+
+        _currentChannel = info with { TotalClients = Math.Max(info.TotalClients, 1) };
+    }
+
+    private void RaiseCurrentChannelChanged()
+    {
+        if (_currentChannel is null)
+            return;
+
+        CurrentChannelChanged?.Invoke(this, _currentChannel);
+    }
+
+    private void OnClientMoved(object? sender, ClientMoved msg)
+    {
+        if (_state != ConnectionState.Connected || msg.ClientId != _client.Book.OwnClient)
+            return;
+
+        UpdateCurrentChannelFromBook();
+        _logger.LogInformation(
+            "Detected move to channel {Channel} (reason: {Reason})",
+            _currentChannel?.DisplayPath ?? msg.TargetChannelId.ToPath(),
+            msg.Reason);
+        RaiseCurrentChannelChanged();
+    }
+
     private void OnClientDisconnected(object? sender, DisconnectEventArgs e)
     {
         if (e.Error != null)
@@ -138,6 +266,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
 
         SetState(ConnectionState.Disconnected);
         RaiseStatus(_closed ? "Disconnected" : $"Disconnected ({e.ExitReason})");
+        _currentChannel = null;
     }
 
     private async Task<IdentityData> ResolveIdentityAsync(CancellationToken cancellationToken)
@@ -218,6 +347,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
     public void Dispose()
     {
         _client.OnDisconnected -= OnClientDisconnected;
+        _client.OnEachClientMoved -= OnClientMoved;
 
         if (_state == ConnectionState.Connected && !_closed)
         {

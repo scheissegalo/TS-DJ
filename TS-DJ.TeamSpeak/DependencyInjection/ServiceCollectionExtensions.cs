@@ -12,6 +12,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITeamSpeakService, TeamSpeakService>();
         services.AddSingleton<TeamSpeakService>(sp => (TeamSpeakService)sp.GetRequiredService<ITeamSpeakService>());
         services.AddSingleton<TeamSpeakNicknameService>();
+        services.AddSingleton<TeamSpeakDescriptionService>();
 
         return services;
     }

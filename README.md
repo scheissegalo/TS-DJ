@@ -22,6 +22,17 @@ dotnet run --project TS-DJ.App
 
 Settings are stored in SQLite at `~/.local/share/TS-DJ/settings.db` (Linux) or `%LOCALAPPDATA%\TS-DJ\settings.db` (Windows).
 
+## Linux desktop launcher
+
+Install a user-local menu entry and icon:
+
+```bash
+chmod +x packaging/linux/install-desktop.sh
+./packaging/linux/install-desktop.sh
+```
+
+This publishes the app to `~/.local/share/ts-dj`, installs a CLI wrapper at `~/.local/bin/ts-dj`, and registers `ts-dj.desktop` in your application menu (with absolute paths so menu launch finds .NET dependencies). Requires the .NET 8 runtime and `libopus0`.
+
 ## Solution Structure
 
 | Project | Purpose |
