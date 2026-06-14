@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Models;
 using TS_DJ.Infrastructure.Settings;
@@ -8,7 +9,7 @@ var logger = loggerFactory.CreateLogger<SqliteSettingsService>();
 
 try
 {
-    var service = new SqliteSettingsService(dbPath, logger);
+    using var service = new SqliteSettingsService(dbPath, logger);
 
     var original = new ConnectionSettings
     {
@@ -46,6 +47,11 @@ try
 }
 finally
 {
-    if (File.Exists(dbPath))
-        File.Delete(dbPath);
+    // Windows CI keeps pooled SQLite handles open after connections are disposed.
+    SqliteConnection.ClearAllPools();
+    foreach (var path in new[] { dbPath, $"{dbPath}-wal", $"{dbPath}-shm" })
+    {
+        if (File.Exists(path))
+            File.Delete(path);
+    }
 }

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TS-DJ.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.2.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.0+c5aa99645c3951606d24365222df23e7a092110e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.0+fdff3d06743e02018b9bb4cc3f0a10b073d55e91")]
 [assembly: System.Reflection.AssemblyProductAttribute("TS-DJ.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TS-DJ.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.2.0.0")]
