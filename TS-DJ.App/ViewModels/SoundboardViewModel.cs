@@ -20,6 +20,8 @@ public partial class SoundboardViewModel : ViewModelBase, IDisposable
     private readonly ILogger<SoundboardViewModel> _logger;
     private readonly ISoundboardService _soundboardService;
     private readonly ITeamSpeakService _teamSpeakService;
+    private readonly Dictionary<int, int> _padPlayRefCounts = [];
+    private readonly Dictionary<int, List<DispatcherTimer>> _padCompletionTimers = [];
     private CancellationTokenSource? _saveDebounceCts;
     private bool _isLoadingSettings;
     private bool _disposed;
@@ -233,16 +235,72 @@ public partial class SoundboardViewModel : ViewModelBase, IDisposable
                 return;
 
             var pad = Pads[index];
-            pad.IsTriggered = true;
+            string? filePath;
+            lock (_padPlayRefCounts)
+            {
+                _padPlayRefCounts.TryGetValue(index, out var count);
+                _padPlayRefCounts[index] = count + 1;
+            }
 
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            pad.IsPlaying = true;
+
+            filePath = pad.FilePath;
+            var durationSeconds = filePath is not null
+                ? _soundboardService.GetEstimatedDurationSeconds(filePath)
+                : 2.0;
+
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(Math.Max(0.1, durationSeconds))
+            };
+
             timer.Tick += (_, _) =>
             {
-                pad.IsTriggered = false;
                 timer.Stop();
+                RemovePadPlaybackInstance(index, timer);
             };
+
+            lock (_padCompletionTimers)
+            {
+                if (!_padCompletionTimers.TryGetValue(index, out var timers))
+                {
+                    timers = [];
+                    _padCompletionTimers[index] = timers;
+                }
+
+                timers.Add(timer);
+            }
+
             timer.Start();
         });
+    }
+
+    private void RemovePadPlaybackInstance(int index, DispatcherTimer timer)
+    {
+        if (index < 0 || index >= Pads.Count)
+            return;
+
+        lock (_padCompletionTimers)
+        {
+            if (_padCompletionTimers.TryGetValue(index, out var timers))
+                timers.Remove(timer);
+        }
+
+        var remaining = 0;
+        lock (_padPlayRefCounts)
+        {
+            if (_padPlayRefCounts.TryGetValue(index, out var count))
+            {
+                remaining = Math.Max(0, count - 1);
+                if (remaining == 0)
+                    _padPlayRefCounts.Remove(index);
+                else
+                    _padPlayRefCounts[index] = remaining;
+            }
+        }
+
+        if (remaining == 0)
+            Pads[index].IsPlaying = false;
     }
 
     private void OnConnectionStateChanged(object? sender, ConnectionState state)
@@ -323,6 +381,15 @@ public partial class SoundboardViewModel : ViewModelBase, IDisposable
         _soundboardService.PadsChanged -= OnPadsChanged;
         _soundboardService.PadTriggered -= OnPadTriggered;
         _teamSpeakService.StateChanged -= OnConnectionStateChanged;
+
+        foreach (var timers in _padCompletionTimers.Values)
+        {
+            foreach (var timer in timers)
+                timer.Stop();
+        }
+
+        _padCompletionTimers.Clear();
+        _padPlayRefCounts.Clear();
         _saveDebounceCts?.Cancel();
         _saveDebounceCts?.Dispose();
     }

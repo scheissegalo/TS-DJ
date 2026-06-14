@@ -256,6 +256,32 @@ public sealed class SoundboardService : ISoundboardService
         }, cancellationToken).ConfigureAwait(false);
     }
 
+    public double GetEstimatedDurationSeconds(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+            return 2.0;
+
+        var clip = _mixerImpl.ClipCache.Get(filePath);
+        if (clip is not null)
+        {
+            return clip.SampleCount / (double)(TS_DJ.Core.Audio.AudioFormat.SampleRate * TS_DJ.Core.Audio.AudioFormat.Channels);
+        }
+
+        try
+        {
+            if (!TS_DJ.Audio.Decoding.AudioFileDecoder.IsSupportedFile(filePath) || !File.Exists(filePath))
+                return 2.0;
+
+            using var decoder = new TS_DJ.Audio.Decoding.AudioFileDecoder();
+            decoder.Open(filePath);
+            return Math.Max(0.1, decoder.TotalTime.TotalSeconds);
+        }
+        catch
+        {
+            return 2.0;
+        }
+    }
+
     private void ValidateIndex(int index)
     {
         lock (_sync)

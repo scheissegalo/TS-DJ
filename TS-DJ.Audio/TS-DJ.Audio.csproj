@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SoundboardSaturationTest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TS-DJ.Core\TS-DJ.Core.csproj" />
     <ProjectReference Include="..\TS-DJ.TeamSpeak\TS-DJ.TeamSpeak.csproj" />
     <ProjectReference Include="..\TSLib\TSLib.csproj" />

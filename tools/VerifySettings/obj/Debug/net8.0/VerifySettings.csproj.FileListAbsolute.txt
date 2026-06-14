@@ -54,3 +54,7 @@
 /media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/obj/Debug/net8.0/VerifySettings.pdb
 /media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/obj/Debug/net8.0/VerifySettings.genruntimeconfig.cache
 /media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/obj/Debug/net8.0/ref/VerifySettings.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/bin/Debug/net8.0/Microsoft.Extensions.Diagnostics.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/bin/Debug/net8.0/Microsoft.Extensions.Diagnostics.Abstractions.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/bin/Debug/net8.0/Microsoft.Extensions.Http.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/obj/Debug/net8.0/VerifySettings.sourcelink.json

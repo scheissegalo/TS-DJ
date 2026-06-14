@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v8.0": {
-      "TS-DJ.Audio/1.0.0": {
+      "TS-DJ.Audio/0.3.3": {
         "dependencies": {
           "BunLabs.NAudio.Flac": "2.0.1",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
@@ -14,8 +14,8 @@
           "NLayer": "1.15.0",
           "NLayer.NAudioSupport": "1.4.0",
           "Splamy.TSLib": "1.1.0",
-          "TS-DJ.Core": "1.0.0",
-          "TS-DJ.TeamSpeak": "1.0.0",
+          "TS-DJ.Core": "0.3.3",
+          "TS-DJ.TeamSpeak": "0.3.3",
           "TSLib": "1.1.0.0"
         },
         "runtime": {
@@ -203,24 +203,24 @@
           }
         }
       },
-      "TS-DJ.Core/1.0.0": {
+      "TS-DJ.Core/0.3.3": {
         "runtime": {
           "TS-DJ.Core.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
+            "assemblyVersion": "0.3.3.0",
+            "fileVersion": "0.3.3.0"
           }
         }
       },
-      "TS-DJ.TeamSpeak/1.0.0": {
+      "TS-DJ.TeamSpeak/0.3.3": {
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
           "Splamy.TSLib": "1.1.0",
-          "TS-DJ.Core": "1.0.0"
+          "TS-DJ.Core": "0.3.3"
         },
         "runtime": {
           "TS-DJ.TeamSpeak.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
+            "assemblyVersion": "0.3.3.0",
+            "fileVersion": "0.3.3.0"
           }
         }
       },
@@ -235,7 +235,7 @@
     }
   },
   "libraries": {
-    "TS-DJ.Audio/1.0.0": {
+    "TS-DJ.Audio/0.3.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -364,12 +364,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "TS-DJ.Core/1.0.0": {
+    "TS-DJ.Core/0.3.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "TS-DJ.TeamSpeak/1.0.0": {
+    "TS-DJ.TeamSpeak/0.3.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

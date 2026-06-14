@@ -17,7 +17,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
     private readonly IWaveProvider _waveProvider;
     private readonly Func<bool> _hasActiveAudio;
     private readonly Action _processLifecycle;
-    private readonly Action? _afterRead;
+    private readonly Action<int>? _afterRead;
     private readonly Action<int>? _onMixedRead;
     private readonly Action<Exception>? _onReadException;
     private readonly ILogger<MixerOutputProducer>? _logger;
@@ -32,7 +32,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
         object sync,
         Func<bool> hasActiveAudio,
         Action processLifecycle,
-        Action? afterRead = null,
+        Action<int>? afterRead = null,
         Action<int>? onMixedRead = null,
         Action<Exception>? onReadException = null,
         ILogger<MixerOutputProducer>? logger = null)
@@ -72,7 +72,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
                         _loggedIdleRead = true;
                     }
 
-                    _afterRead?.Invoke();
+                    _afterRead?.Invoke(0);
                     _processLifecycle();
                     return 0;
                 }
@@ -103,7 +103,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
                 }
 
                 _onMixedRead?.Invoke(read);
-                _afterRead?.Invoke();
+                _afterRead?.Invoke(read);
                 _processLifecycle();
                 return read;
             }
@@ -114,7 +114,7 @@ public sealed class MixerOutputProducer : IAudioPassiveProducer, ISampleInfo
                     "MixerOutputProducer: exception during read #{ReadCount} — isolating failure, returning 0 (mixer survives)",
                     _readCount);
                 _onReadException?.Invoke(ex);
-                _afterRead?.Invoke();
+                _afterRead?.Invoke(0);
                 _processLifecycle();
                 return 0;
             }

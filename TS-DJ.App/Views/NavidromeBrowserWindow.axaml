@@ -20,27 +20,16 @@
 
     <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="16" RowSpacing="12">
 
-        <!-- Connection -->
+        <!-- Connection status -->
         <Border Grid.Row="0" Padding="12" CornerRadius="8" BorderThickness="1"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
             <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Grid.Column="0" Text="Navidrome Connection" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="0" Text="Navidrome" FontSize="16" FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="1" Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Opacity="0.8"/>
                 </Grid>
-
-                <Grid ColumnDefinitions="Auto,*,Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="8">
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Server" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerUrl}" PlaceholderText="http://10.0.0.1:4533"/>
-
-                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Username" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Username}"/>
-
-                    <Button Grid.Row="0" Grid.Column="4" Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
-
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding Password}" PasswordChar="•"/>
-                </Grid>
+                <TextBlock Text="{Binding CredentialsHint}" Opacity="0.75" TextWrapping="Wrap"/>
+                <Button Content="Reconnect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" HorizontalAlignment="Left"/>
             </StackPanel>
         </Border>
 

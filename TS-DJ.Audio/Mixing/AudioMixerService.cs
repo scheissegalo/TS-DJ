@@ -57,10 +57,10 @@ public sealed class AudioMixerService : IAudioMixerService
             _sync,
             HasActiveAudioLocked,
             ProcessLifecycleLocked,
-            () =>
+            mixerReadBytes =>
             {
                 if (Soundboard is SoundEffectSource soundboard)
-                    soundboard.TickCleanup();
+                    soundboard.TickCleanup(mixerReadBytes);
             },
             Music.NotifyMixedRead,
             OnMixerReadException,

@@ -5,7 +5,7 @@
   },
   "projects": {
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj": {
-      "version": "0.2.0",
+      "version": "0.3.3",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj",
         "projectName": "TS-DJ.Audio",
@@ -96,7 +96,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
-      "version": "0.2.0",
+      "version": "0.3.3",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
@@ -155,7 +155,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj": {
-      "version": "0.2.0",
+      "version": "0.3.3",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
         "projectName": "TS-DJ.TeamSpeak",

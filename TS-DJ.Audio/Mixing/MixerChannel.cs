@@ -32,10 +32,11 @@ public sealed class MixerChannel
 
     public void Attach(MixingSampleProvider mixer)
     {
-        if (_mixer == mixer)
-            return;
+        // Always re-register: NAudio may silently remove inputs that returned 0 samples
+        // while _mixer still points at the parent mixer (stale IsAttached).
+        if (_mixer is not null)
+            _mixer.RemoveMixerInput(_volumeProvider);
 
-        Detach();
         _mixer = mixer;
         _mixer.AddMixerInput(_volumeProvider);
     }

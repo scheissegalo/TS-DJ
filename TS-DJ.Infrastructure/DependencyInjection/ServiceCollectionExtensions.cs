@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Services;
 using TS_DJ.Infrastructure.Logging;
 using TS_DJ.Infrastructure.Navidrome;
+using TS_DJ.Infrastructure.Playlists;
 using TS_DJ.Infrastructure.Settings;
 
 namespace TS_DJ.Infrastructure.DependencyInjection;
@@ -35,6 +36,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<INavidromeService>(sp => sp.GetRequiredService<NavidromeService>());
         services.AddSingleton<IPlaybackStreamUrlProvider>(sp => sp.GetRequiredService<NavidromeService>());
+        services.AddSingleton<IPlaylistService, PlaylistService>();
 
         return services;
     }

@@ -1,0 +1,51 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TS_DJ.App.ViewModels"
+        xmlns:models="using:TS_DJ.Core.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="520"
+        d:DesignHeight="400"
+        x:Class="TS_DJ.App.Views.PlaylistManagerDialog"
+        x:DataType="vm:PlaylistManagerViewModel"
+        Title="Manage Playlists"
+        Width="520"
+        Height="400"
+        MinWidth="400"
+        MinHeight="320"
+        Opened="PlaylistManagerDialog_OnOpened">
+
+    <Design.DataContext>
+        <vm:PlaylistManagerViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*,Auto" Margin="16" RowSpacing="12">
+        <Grid Grid.Row="0" ColumnDefinitions="200,*" ColumnSpacing="12">
+            <ListBox Grid.Column="0" ItemsSource="{Binding Playlists}" SelectedItem="{Binding SelectedPlaylist}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="models:SavedPlaylistSummary">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding EntryCount, StringFormat={}{0} tracks}" FontSize="11" Opacity="0.75"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <StackPanel Grid.Column="1" Spacing="8">
+                <TextBlock Text="Playlist details" FontWeight="SemiBold"/>
+                <TextBlock Text="Name"/>
+                <TextBox Text="{Binding EditName}"/>
+                <TextBlock Text="Description"/>
+                <TextBox Text="{Binding EditDescription}" AcceptsReturn="True" MinHeight="80"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Save changes" Command="{Binding RenameCommand}" IsEnabled="{Binding CanRename}"/>
+                    <Button Content="Delete" Command="{Binding DeleteCommand}" IsEnabled="{Binding CanDelete}"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <Button Grid.Row="1" Content="Close" HorizontalAlignment="Right" Click="CloseButton_OnClick"/>
+    </Grid>
+</Window>

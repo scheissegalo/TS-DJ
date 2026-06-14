@@ -39,9 +39,18 @@ public partial class App : Application
                 services.AddSingleton<NavidromeMediaQueueService>();
                 services.AddSingleton<INavidromeMediaQueueService>(sp => sp.GetRequiredService<NavidromeMediaQueueService>());
                 services.AddTransient<NavidromeBrowserViewModel>();
+                services.AddSingleton<ConnectionProfileSelectorViewModel>();
                 services.AddSingleton<SoundboardViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<ApplicationShutdownService>();
+
+                services.AddTransient<OptionsViewModel>();
+                services.AddTransient<TeamSpeakConnectionsOptionsViewModel>();
+                services.AddTransient<AudioOptionsViewModel>();
+                services.AddTransient<NavidromeOptionsViewModel>();
+                services.AddTransient<SoundboardOptionsViewModel>();
+                services.AddTransient<UiPreferencesOptionsViewModel>();
+                services.AddTransient<PlaylistManagerViewModel>();
             })
             .ConfigureLogging(logging =>
             {

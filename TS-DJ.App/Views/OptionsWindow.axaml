@@ -1,0 +1,153 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TS_DJ.App.ViewModels"
+        xmlns:models="using:TS_DJ.Core.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="820"
+        d:DesignHeight="560"
+        x:Class="TS_DJ.App.Views.OptionsWindow"
+        x:DataType="vm:OptionsViewModel"
+        Title="Options"
+        Width="820"
+        Height="560"
+        MinWidth="640"
+        MinHeight="420"
+        Opened="OptionsWindow_OnOpened">
+
+    <Design.DataContext>
+        <vm:OptionsViewModel/>
+    </Design.DataContext>
+
+    <Window.DataTemplates>
+        <DataTemplate DataType="vm:TeamSpeakConnectionsOptionsViewModel">
+            <StackPanel Spacing="12">
+                <TextBlock Text="TeamSpeak connection profiles" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="Saved servers used for quick connect on the main window." Opacity="0.75"/>
+
+                <Grid ColumnDefinitions="200,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="8">
+                        <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Height="280">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="models:TeamSpeakConnectionProfile">
+                                    <TextBlock Text="{Binding DisplayLabel}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Add" Command="{Binding AddProfileCommand}"/>
+                            <Button Content="Remove" Command="{Binding RemoveProfileCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Border Grid.Column="1" Padding="12" CornerRadius="8" BorderThickness="1"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Profile details" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditName}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Server" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditAddress}" PlaceholderText="ts.example.com"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Nickname" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EditNickname}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding EditServerPassword}" PasswordChar="•"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Default channel" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditDefaultChannel}" PlaceholderText="/1 or channel path"/>
+                            </Grid>
+                            <Button Content="Save profile" Command="{Binding SaveProfileCommand}" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:AudioOptionsViewModel">
+            <StackPanel Spacing="12" MaxWidth="480">
+                <TextBlock Text="Audio settings" FontSize="16" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Music volume" VerticalAlignment="Center"/>
+                    <Slider Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding MusicVolume}" TickFrequency="10"/>
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding MusicVolume, StringFormat={}{0:0}}" MinWidth="28"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Master volume" VerticalAlignment="Center"/>
+                    <Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding MasterVolume}" TickFrequency="10"/>
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MasterVolume, StringFormat={}{0:0}}" MinWidth="28"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Opus bitrate" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding OpusBitrateOptions}" SelectedItem="{Binding SelectedOpusBitrate}"/>
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:NavidromeOptionsViewModel">
+            <StackPanel Spacing="12" MaxWidth="520">
+                <TextBlock Text="Navidrome settings" FontSize="16" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Server URL" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerUrl}" PlaceholderText="http://10.0.0.1:4533"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Username" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Username}"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Password}" PasswordChar="•"/>
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:SoundboardOptionsViewModel">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Soundboard settings" FontSize="16" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" MaxWidth="480">
+                    <TextBlock Grid.Column="0" Text="Global volume" VerticalAlignment="Center"/>
+                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
+                    <TextBlock Grid.Column="2" Text="{Binding Volume, StringFormat={}{0:0}}" MinWidth="28"/>
+                </Grid>
+                <TextBlock Text="Per-pad configuration" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                <ItemsControl ItemsSource="{Binding Pads}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SoundboardPadViewModel">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,2">
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="{Binding FileNameDisplay}" Opacity="0.75" VerticalAlignment="Center"/>
+                                <Button Grid.Column="2" Content="Configure…" Command="{Binding $parent[ItemsControl].((vm:SoundboardOptionsViewModel)DataContext).OpenPadSettingsCommand}"
+                                        CommandParameter="{Binding}" Padding="8,2"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:UiPreferencesOptionsViewModel">
+            <StackPanel Spacing="12" MaxWidth="480">
+                <TextBlock Text="UI preferences" FontSize="16" FontWeight="SemiBold"/>
+                <CheckBox Content="Show soundboard panel on startup" IsChecked="{Binding IsSoundboardVisible}"/>
+            </StackPanel>
+        </DataTemplate>
+    </Window.DataTemplates>
+
+    <Grid ColumnDefinitions="180,*" Margin="16" ColumnSpacing="12">
+        <Border Grid.Column="0" Padding="8" CornerRadius="8" BorderThickness="1"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <ListBox ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}" Background="Transparent" BorderThickness="0">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OptionsSectionItem">
+                        <TextBlock Text="{Binding Title}" Padding="4,6"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ContentControl Content="{Binding CurrentSectionContent}"/>
+        </ScrollViewer>
+    </Grid>
+</Window>

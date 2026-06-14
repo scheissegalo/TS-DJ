@@ -10,6 +10,8 @@ public interface ISoundboardService
     event EventHandler? PadsChanged;
     event EventHandler<int>? PadTriggered;
 
+    double GetEstimatedDurationSeconds(string filePath);
+
     Task LoadAsync(CancellationToken cancellationToken = default);
     Task SaveAsync(CancellationToken cancellationToken = default);
 

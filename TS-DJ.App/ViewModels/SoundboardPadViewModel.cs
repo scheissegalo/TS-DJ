@@ -20,7 +20,7 @@ public partial class SoundboardPadViewModel : ViewModelBase
     private int _gainHuman = 100;
 
     [ObservableProperty]
-    private bool _isTriggered;
+    private bool _isPlaying;
 
     [ObservableProperty]
     private bool _isConnected;
@@ -47,7 +47,7 @@ public partial class SoundboardPadViewModel : ViewModelBase
 
     partial void OnHotkeyChanged(string? value) => OnPropertyChanged(nameof(HotkeyDisplay));
 
-    partial void OnIsTriggeredChanged(bool value) => HighlightBorderThickness = value ? 2 : 1;
+    partial void OnIsPlayingChanged(bool value) => HighlightBorderThickness = value ? 2 : 1;
 
     partial void OnIsConnectedChanged(bool value) => OnPropertyChanged(nameof(CanPlay));
 }

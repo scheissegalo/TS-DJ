@@ -19,6 +19,15 @@ public interface ISettingsService
     Task<NavidromeSettings> LoadNavidromeSettingsAsync(CancellationToken cancellationToken = default);
     Task SaveNavidromeSettingsAsync(NavidromeSettings settings, CancellationToken cancellationToken = default);
 
+    Task<TeamSpeakConnectionProfilesSettings> LoadTeamSpeakConnectionProfilesAsync(CancellationToken cancellationToken = default);
+    Task SaveTeamSpeakConnectionProfilesAsync(TeamSpeakConnectionProfilesSettings settings, CancellationToken cancellationToken = default);
+
+    Task<PlaylistLibrary> LoadPlaylistLibraryAsync(CancellationToken cancellationToken = default);
+    Task SavePlaylistLibraryAsync(PlaylistLibrary library, CancellationToken cancellationToken = default);
+    Task<SavedPlaylist?> LoadSavedPlaylistAsync(Guid id, CancellationToken cancellationToken = default);
+    Task SaveSavedPlaylistAsync(SavedPlaylist playlist, CancellationToken cancellationToken = default);
+    Task DeleteSavedPlaylistAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task<string?> GetSettingAsync(string key, CancellationToken cancellationToken = default);
     Task SetSettingAsync(string key, string? value, CancellationToken cancellationToken = default);
 }

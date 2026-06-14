@@ -387,6 +387,226 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
         }
     }
 
+    public async Task<TeamSpeakConnectionProfilesSettings> LoadTeamSpeakConnectionProfilesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, TeamSpeakConnectionProfilesSettings.ConfigKey, cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                var settings = JsonSerializer.Deserialize<TeamSpeakConnectionProfilesSettings>(raw);
+                if (settings is not null && settings.Profiles.Count > 0)
+                {
+                    _logger.LogDebug("Loaded {Count} TeamSpeak connection profiles", settings.Profiles.Count);
+                    return settings;
+                }
+            }
+
+            var migrated = await MigrateConnectionProfilesFromLegacyAsync(connection, cancellationToken);
+            _logger.LogInformation("Migrated legacy connection settings to profile '{Name}'", migrated.Profiles[0].Name);
+            return migrated;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load TeamSpeak connection profiles");
+            return new TeamSpeakConnectionProfilesSettings();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SaveTeamSpeakConnectionProfilesAsync(
+        TeamSpeakConnectionProfilesSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(settings);
+            await WriteSettingAsync(connection, transaction, TeamSpeakConnectionProfilesSettings.ConfigKey, json, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Saved {Count} TeamSpeak connection profiles", settings.Profiles.Count);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save TeamSpeak connection profiles");
+            throw new InvalidOperationException("Could not save TeamSpeak connection profiles.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<PlaylistLibrary> LoadPlaylistLibraryAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, PlaylistLibrary.IndexKey, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return new PlaylistLibrary();
+
+            var library = JsonSerializer.Deserialize<PlaylistLibrary>(raw);
+            return library ?? new PlaylistLibrary();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load playlist library");
+            return new PlaylistLibrary();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SavePlaylistLibraryAsync(PlaylistLibrary library, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(library);
+            await WriteSettingAsync(connection, transaction, PlaylistLibrary.IndexKey, json, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save playlist library");
+            throw new InvalidOperationException("Could not save playlist library.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<SavedPlaylist?> LoadSavedPlaylistAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, SavedPlaylist.StorageKey(id), cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            return JsonSerializer.Deserialize<SavedPlaylist>(raw);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load playlist {PlaylistId}", id);
+            return null;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SaveSavedPlaylistAsync(SavedPlaylist playlist, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(playlist);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(playlist);
+            await WriteSettingAsync(connection, transaction, SavedPlaylist.StorageKey(playlist.Id), json, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save playlist {PlaylistId}", playlist.Id);
+            throw new InvalidOperationException($"Could not save playlist '{playlist.Name}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task DeleteSavedPlaylistAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+            await using var command = connection.CreateCommand();
+            command.Transaction = (SqliteTransaction)transaction;
+            command.CommandText = "DELETE FROM app_settings WHERE key = $key;";
+            command.Parameters.AddWithValue("$key", SavedPlaylist.StorageKey(id));
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to delete playlist {PlaylistId}", id);
+            throw new InvalidOperationException($"Could not delete playlist {id}.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    private async Task<TeamSpeakConnectionProfilesSettings> MigrateConnectionProfilesFromLegacyAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var legacy = new ConnectionSettings
+        {
+            Address = await ReadSettingAsync(connection, "connection.address", cancellationToken) ?? string.Empty,
+            Nickname = await ReadSettingAsync(connection, "connection.nickname", cancellationToken) ?? "TS-DJ",
+            ServerPassword = await ReadSettingAsync(connection, "connection.server_password", cancellationToken) ?? string.Empty,
+            Channel = await ReadSettingAsync(connection, "connection.channel", cancellationToken) ?? string.Empty
+        };
+
+        var profile = new TeamSpeakConnectionProfile
+        {
+            Name = string.IsNullOrWhiteSpace(legacy.Address) ? "Default" : legacy.Address,
+            Address = legacy.Address,
+            Nickname = legacy.Nickname,
+            ServerPassword = legacy.ServerPassword,
+            DefaultChannel = legacy.Channel
+        };
+
+        var settings = new TeamSpeakConnectionProfilesSettings
+        {
+            Profiles = [profile],
+            SelectedProfileId = profile.Id
+        };
+
+        var json = JsonSerializer.Serialize(settings);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await WriteSettingAsync(connection, transaction, TeamSpeakConnectionProfilesSettings.ConfigKey, json, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return settings;
+    }
+
     private static int ClampVolumeHuman(string? raw, int defaultValue)
     {
         if (!int.TryParse(raw, out var value))

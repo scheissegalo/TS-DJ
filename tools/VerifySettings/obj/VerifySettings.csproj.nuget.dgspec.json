@@ -5,7 +5,7 @@
   },
   "projects": {
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
-      "version": "0.2.0",
+      "version": "0.3.3",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
@@ -64,7 +64,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj": {
-      "version": "0.2.0",
+      "version": "0.3.3",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
         "projectName": "TS-DJ.Infrastructure",
@@ -149,7 +149,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/VerifySettings.csproj": {
-      "version": "0.2.0",
+      "version": "0.3.3",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/VerifySettings.csproj",
         "projectName": "VerifySettings",

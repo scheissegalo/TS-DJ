@@ -1,5 +1,16 @@
 Stream Audio Input
 2Deck DJ and Playlist mode switch
+add Discord support
+add Mumble support
+Add youtube support - Download and play
+<!-- Highlight Playing soundboard item -->
+<!-- Options as seperate window, add teamspeak connections here, options to add multiple servers here stored as favorites. On main window we instead have a dropdown with favorites. -->
+<!-- Playlist management, Save playlists, load playlist. -->
+
+Add recording of Teamspeak audio (listen to teamspeak audio and record)
+Show waveform and signal of recieved teamspeak audio.
+Instant record and add to soundboard.
+Live DJ possibilities, auto quantize, voice chopping, looping, recognize silence etc.
 
 Issues:
-Log does not auto scroll to last entry
+Log still does not auto scroll to last entry

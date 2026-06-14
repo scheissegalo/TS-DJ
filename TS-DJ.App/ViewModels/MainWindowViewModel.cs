@@ -23,21 +23,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IAudioMixerService _audioMixerService;
     private readonly ISettingsService _settingsService;
     private readonly ILogService _logService;
+    private readonly IPlaylistService _playlistService;
     private readonly TeamSpeakNicknameService _nicknameService;
     private readonly DispatcherTimer _progressTimer;
     private CancellationTokenSource? _volumeSaveDebounceCts;
     private bool _isLoadingSettings;
     private bool _disposed;
     private string? _lastPlayingSourceKeyForScroll;
-
-    [ObservableProperty]
-    private string _serverAddress = string.Empty;
-
-    [ObservableProperty]
-    private string _nickname = "TS-DJ";
-
-    [ObservableProperty]
-    private string _serverPassword = string.Empty;
 
     [ObservableProperty]
     private string _channel = string.Empty;
@@ -96,10 +88,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _hasQueueItems;
 
     [ObservableProperty]
-    private OpusBitrateOption? _selectedOpusBitrate;
-
-    [ObservableProperty]
-    private string _opusBitrateDisplay = OpusBitratePresets.Label(OpusBitratePresets.Default);
+    private bool _isSoundboardVisible = true;
 
     [ObservableProperty]
     private PlaybackQueueItemViewModel? _selectedQueueItem;
@@ -107,8 +96,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private PlaybackQueueItemViewModel? _currentlyPlayingItem;
 
+    public ConnectionProfileSelectorViewModel ConnectionProfiles { get; }
+
+    public ObservableCollection<SavedPlaylistSummary> SavedPlaylists { get; } = [];
+
     [ObservableProperty]
-    private bool _isSoundboardVisible = true;
+    private SavedPlaylistSummary? _selectedSavedPlaylist;
 
     public string SoundboardToggleLabel => IsSoundboardVisible ? "Hide Soundboard" : "Show Soundboard";
 
@@ -118,7 +111,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public string WindowTitle => $"TS-DJ {ApplicationVersion}";
 
-    public bool CanConnect => !IsConnected && !IsConnecting;
+    public bool CanConnect => !IsConnected && !IsConnecting && ConnectionProfiles.SelectedProfile is not null;
     public bool CanDisconnect => IsConnected;
     public bool CanPlay => IsConnected && HasQueueItems && !IsPlaying && !IsPaused;
     public bool CanPause => IsPlaying;
@@ -142,13 +135,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public event EventHandler<LogEntry>? LogEntryAppended;
     public event EventHandler<PlaybackQueueItemViewModel?>? QueueScrollTargetChanged;
     public ObservableCollection<PlaybackQueueItemViewModel> QueueItems { get; } = [];
-    public ObservableCollection<OpusBitrateOption> OpusBitrateOptions { get; } =
-    [
-        new(OpusBitratePresets.Low, OpusBitratePresets.Label(OpusBitratePresets.Low)),
-        new(OpusBitratePresets.Medium, OpusBitratePresets.Label(OpusBitratePresets.Medium)),
-        new(OpusBitratePresets.High, OpusBitratePresets.Label(OpusBitratePresets.High)),
-        new(OpusBitratePresets.VeryHigh, OpusBitratePresets.Label(OpusBitratePresets.VeryHigh))
-    ];
 
     public SoundboardViewModel Soundboard { get; }
 
@@ -159,17 +145,31 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         IAudioMixerService audioMixerService,
         ISettingsService settingsService,
         ILogService logService,
+        IPlaylistService playlistService,
         TeamSpeakNicknameService nicknameService,
-        SoundboardViewModel soundboardViewModel)
+        SoundboardViewModel soundboardViewModel,
+        ConnectionProfileSelectorViewModel connectionProfileSelectorViewModel)
     {
         _logger = logger;
         _teamSpeakService = teamSpeakService;
         Soundboard = soundboardViewModel;
+        ConnectionProfiles = connectionProfileSelectorViewModel;
         _audioPlaybackService = audioPlaybackService;
         _audioMixerService = audioMixerService;
         _settingsService = settingsService;
         _logService = logService;
+        _playlistService = playlistService;
         _nicknameService = nicknameService;
+
+        ConnectionProfiles.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(ConnectionProfileSelectorViewModel.SelectedProfile))
+            {
+                if (!IsConnected)
+                    Channel = ConnectionProfiles.GetDefaultChannel();
+                NotifyCommandStatesChanged();
+            }
+        };
 
         _teamSpeakService.StateChanged += OnConnectionStateChanged;
         _teamSpeakService.StatusMessage += OnStatusMessage;
@@ -178,7 +178,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioPlaybackService.StateChanged += OnPlaybackStateChanged;
         _audioMixerService.QueueChanged += OnQueueChanged;
         _audioMixerService.NowPlayingChanged += OnNowPlayingChanged;
-        _audioMixerService.EncoderBitrateChanged += OnEncoderBitrateChanged;
         _logService.EntryAdded += OnLogEntryAdded;
 
         _progressTimer = new DispatcherTimer
@@ -202,25 +201,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _isLoadingSettings = true;
         try
         {
-            var settings = await _settingsService.LoadConnectionSettingsAsync();
-            ServerAddress = settings.Address;
-            Nickname = settings.Nickname;
-            ServerPassword = settings.ServerPassword;
-            Channel = settings.Channel;
+            await ConnectionProfiles.LoadProfilesAsync();
+            Channel = ConnectionProfiles.GetDefaultChannel();
 
             var audioSettings = await _settingsService.LoadAudioSettingsAsync();
             Volume = audioSettings.MusicVolumeHuman;
             MasterVolume = audioSettings.MasterVolumeHuman;
             _audioPlaybackService.Volume = AudioValues.HumanVolumeToFactor((float)Volume);
             _audioMixerService.MasterVolume = AudioValues.HumanVolumeToFactor((float)MasterVolume);
-
             _audioMixerService.EncoderBitrateKbps = audioSettings.OpusBitrateKbps;
-            OpusBitrateDisplay = OpusBitratePresets.Label(_audioMixerService.EncoderBitrateKbps);
-            SelectedOpusBitrate = OpusBitrateOptions.FirstOrDefault(option => option.Kbps == _audioMixerService.EncoderBitrateKbps)
-                ?? OpusBitrateOptions[1];
 
             var uiSettings = await _settingsService.LoadUiSettingsAsync();
             IsSoundboardVisible = uiSettings.IsSoundboardVisible;
+
+            await RefreshSavedPlaylistsAsync();
         }
         catch (Exception ex)
         {
@@ -232,20 +226,28 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public async Task RefreshSavedPlaylistsAsync()
+    {
+        try
+        {
+            var items = await _playlistService.ListAsync();
+            SavedPlaylists.Clear();
+            foreach (var item in items)
+                SavedPlaylists.Add(item);
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to load saved playlists", ex);
+        }
+    }
+
     public async Task SaveSettingsForShutdownAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            await _settingsService.SaveConnectionSettingsAsync(new ConnectionSettings
-            {
-                Address = ServerAddress,
-                Nickname = Nickname,
-                ServerPassword = ServerPassword,
-                Channel = Channel
-            }, cancellationToken);
-
             await SaveAudioSettingsAsync(cancellationToken);
             await Soundboard.SaveForShutdownAsync(cancellationToken);
+            await ConnectionProfiles.UpdateProfileDefaultChannelAsync(Channel, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -306,13 +308,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            await _settingsService.SaveConnectionSettingsAsync(new ConnectionSettings
-            {
-                Address = ServerAddress,
-                Nickname = Nickname,
-                ServerPassword = ServerPassword,
-                Channel = Channel
-            }, cancellationToken);
+            await ConnectionProfiles.UpdateProfileDefaultChannelAsync(Channel, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -388,18 +384,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task ConnectAsync()
     {
-        var settings = new ConnectionSettings
-        {
-            Address = ServerAddress,
-            Nickname = Nickname,
-            ServerPassword = ServerPassword,
-            Channel = Channel
-        };
+        if (ConnectionProfiles.SelectedProfile is null)
+            return;
 
         try
         {
-            _nicknameService.SetBaseNickname(Nickname);
-            await _settingsService.SaveConnectionSettingsAsync(settings);
+            var settings = ConnectionProfiles.ToConnectionSettings(Channel);
+            _nicknameService.SetBaseNickname(settings.Nickname);
+            await ConnectionProfiles.PersistSelectedProfileIdAsync();
             await _teamSpeakService.ConnectAsync(settings);
         }
         catch (Exception ex)
@@ -421,6 +413,193 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             LogError("Disconnect failed", ex);
         }
+    }
+
+    [RelayCommand]
+    private void OpenOptions()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+        var viewModel = App.Services.GetRequiredService<OptionsViewModel>();
+        var window = new Views.OptionsWindow
+        {
+            DataContext = viewModel
+        };
+
+        window.Closed += async (_, _) =>
+        {
+            await ConnectionProfiles.LoadProfilesAsync();
+            try
+            {
+                var uiSettings = await _settingsService.LoadUiSettingsAsync();
+                IsSoundboardVisible = uiSettings.IsSoundboardVisible;
+            }
+            catch (Exception ex)
+            {
+                LogError("Failed to reload UI settings after Options", ex);
+            }
+        };
+
+        if (desktop.MainWindow is Window owner)
+            window.Show(owner);
+        else
+            window.Show();
+    }
+
+    [RelayCommand]
+    private void OpenOptionsTeamSpeak()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+        var viewModel = App.Services.GetRequiredService<OptionsViewModel>();
+        viewModel.OpenWithSectionCommand.Execute(OptionsSection.TeamSpeakConnections);
+
+        var window = new Views.OptionsWindow
+        {
+            DataContext = viewModel
+        };
+
+        window.Closed += async (_, _) =>
+        {
+            await ConnectionProfiles.LoadProfilesAsync();
+            try
+            {
+                var uiSettings = await _settingsService.LoadUiSettingsAsync();
+                IsSoundboardVisible = uiSettings.IsSoundboardVisible;
+            }
+            catch (Exception ex)
+            {
+                LogError("Failed to reload UI settings after Options", ex);
+            }
+        };
+
+        if (desktop.MainWindow is Window owner)
+            window.Show(owner);
+        else
+            window.Show();
+    }
+
+    [RelayCommand]
+    private async Task SavePlaylistAsync()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+        if (desktop.MainWindow is not Window owner)
+            return;
+
+        var dialogVm = new SavePlaylistDialogViewModel();
+        var dialog = new Views.SavePlaylistDialog
+        {
+            DataContext = dialogVm
+        };
+
+        var result = await dialog.ShowDialog<bool>(owner);
+        if (!result)
+            return;
+
+        try
+        {
+            var queue = _audioMixerService.Queue.ToList();
+            await _playlistService.SaveFromQueueAsync(dialogVm.Name.Trim(), queue, dialogVm.Description);
+            await RefreshSavedPlaylistsAsync();
+            _logService.Add(new LogEntry
+            {
+                Timestamp = DateTime.Now,
+                Level = "Info",
+                Message = $"Saved playlist '{dialogVm.Name.Trim()}' ({queue.Count} tracks)"
+            });
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to save playlist", ex);
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadPlaylistAsync(SavedPlaylistSummary? summary)
+    {
+        if (summary is null)
+            return;
+
+        await LoadPlaylistInternalAsync(summary, replaceQueue: true, playFirst: false);
+    }
+
+    [RelayCommand]
+    private async Task AppendPlaylistAsync(SavedPlaylistSummary? summary)
+    {
+        if (summary is null)
+            return;
+
+        await LoadPlaylistInternalAsync(summary, replaceQueue: false, playFirst: false);
+    }
+
+    [RelayCommand]
+    private async Task PlayPlaylistNowAsync(SavedPlaylistSummary? summary)
+    {
+        if (summary is null)
+            return;
+
+        await LoadPlaylistInternalAsync(summary, replaceQueue: true, playFirst: true);
+    }
+
+    private async Task LoadPlaylistInternalAsync(SavedPlaylistSummary summary, bool replaceQueue, bool playFirst)
+    {
+        try
+        {
+            var playlist = await _playlistService.GetAsync(summary.Id);
+            if (playlist is null)
+            {
+                LogError($"Playlist '{summary.Name}' not found", new InvalidOperationException("Missing playlist"));
+                return;
+            }
+
+            var items = _playlistService.ResolveEntries(playlist);
+            if (replaceQueue)
+                _audioMixerService.ClearQueue();
+
+            _audioMixerService.EnqueueRange(items);
+
+            if (playFirst && items.Count > 0)
+                await _audioPlaybackService.PlayQueueItemAsync(0);
+
+            _logService.Add(new LogEntry
+            {
+                Timestamp = DateTime.Now,
+                Level = "Info",
+                Message = $"{(replaceQueue ? "Loaded" : "Appended")} playlist '{summary.Name}' ({items.Count} tracks)"
+            });
+        }
+        catch (Exception ex)
+        {
+            LogError($"Failed to load playlist '{summary.Name}'", ex);
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenPlaylistManagerAsync()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+        var viewModel = App.Services.GetRequiredService<PlaylistManagerViewModel>();
+        var dialog = new Views.PlaylistManagerDialog
+        {
+            DataContext = viewModel
+        };
+
+        if (desktop.MainWindow is Window owner)
+            await dialog.ShowDialog(owner);
+        else
+            dialog.Show();
+
+        await RefreshSavedPlaylistsAsync();
     }
 
     [RelayCommand]
@@ -576,16 +755,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ScheduleAudioSettingsSave();
     }
 
-    partial void OnSelectedOpusBitrateChanged(OpusBitrateOption? value)
-    {
-        if (_isLoadingSettings || value is null)
-            return;
-
-        _audioMixerService.EncoderBitrateKbps = value.Kbps;
-        OpusBitrateDisplay = OpusBitratePresets.Label(_audioMixerService.EncoderBitrateKbps);
-        _ = SaveAudioSettingsAsync();
-    }
-
     partial void OnSelectedQueueItemChanged(PlaybackQueueItemViewModel? value) =>
         NotifyCommandStatesChanged();
 
@@ -665,7 +834,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
             if (state == ConnectionState.Connected)
             {
-                _nicknameService.SetBaseNickname(Nickname);
+                _nicknameService.SetBaseNickname(ConnectionProfiles.SelectedNickname);
                 _ = _nicknameService.ApplyInitialStatusAsync();
             }
             else if (state == ConnectionState.Disconnected || state == ConnectionState.Error)
@@ -806,12 +975,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             : $"{time.Minutes}:{time.Seconds:D2}";
     }
 
-    private void OnEncoderBitrateChanged(object? sender, EventArgs e)
-    {
-        Dispatcher.UIThread.Post(() =>
-            OpusBitrateDisplay = OpusBitratePresets.Label(_audioMixerService.EncoderBitrateKbps));
-    }
-
     private void OnLogEntryAdded(object? sender, LogEntry entry)
     {
         Dispatcher.UIThread.Post(() =>
@@ -866,7 +1029,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioPlaybackService.StateChanged -= OnPlaybackStateChanged;
         _audioMixerService.QueueChanged -= OnQueueChanged;
         _audioMixerService.NowPlayingChanged -= OnNowPlayingChanged;
-        _audioMixerService.EncoderBitrateChanged -= OnEncoderBitrateChanged;
         _logService.EntryAdded -= OnLogEntryAdded;
         Soundboard.Dispose();
     }

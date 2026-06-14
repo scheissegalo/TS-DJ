@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:TS_DJ.App.ViewModels"
+        xmlns:models="using:TS_DJ.Core.Models"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -35,18 +36,28 @@
                         <TextBlock Grid.Column="2" Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Opacity="0.8"/>
                     </Grid>
 
-                    <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Server" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerAddress}" PlaceholderText="ts.example.com or 127.0.0.1" IsEnabled="{Binding !IsConnected}"/>
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                        <ComboBox Grid.Column="0"
+                                  ItemsSource="{Binding ConnectionProfiles.Profiles}"
+                                  SelectedItem="{Binding ConnectionProfiles.SelectedProfile}"
+                                  PlaceholderText="Select server profile"
+                                  IsEnabled="{Binding !IsConnected}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate DataType="models:TeamSpeakConnectionProfile">
+                                    <TextBlock Text="{Binding DisplayLabel}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="1" Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
+                        <Button Grid.Column="2" Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding CanDisconnect}"/>
+                        <Button Grid.Column="3" Content="Options…" Command="{Binding OpenOptionsCommand}"/>
+                        <Button Grid.Column="4" Content="Profiles…" Command="{Binding OpenOptionsTeamSpeakCommand}" ToolTip.Tip="Manage connection profiles"/>
+                    </Grid>
 
-                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Nickname" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Nickname}" IsEnabled="{Binding !IsConnected}"/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ServerPassword}" PasswordChar="•" IsEnabled="{Binding !IsConnected}"/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="2" Text="Channel" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Row="1" Grid.Column="3" Spacing="6">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" Text="Channel" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Spacing="6">
                             <ComboBox ItemsSource="{Binding AvailableChannels}"
                                       SelectedItem="{Binding SelectedChannel}"
                                       Text="{Binding Channel}"
@@ -62,11 +73,6 @@
                                 <CheckBox Content="Show empty channels" IsChecked="{Binding ShowEmptyChannels}"/>
                                 <Button Content="↻" Command="{Binding RefreshChannelsCommand}" ToolTip.Tip="Refresh channels"/>
                             </StackPanel>
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="8">
-                            <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
-                            <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding CanDisconnect}"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
@@ -119,20 +125,30 @@
                         <TextBlock Grid.Column="2" Text="{Binding MasterVolume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
                     </Grid>
 
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                        <TextBlock Grid.Column="0" Text="Opus bitrate" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Column="1"
-                                  ItemsSource="{Binding OpusBitrateOptions}"
-                                  SelectedItem="{Binding SelectedOpusBitrate}"
-                                  HorizontalAlignment="Stretch"/>
-                        <TextBlock Grid.Column="2" Text="{Binding OpusBitrateDisplay}" VerticalAlignment="Center" MinWidth="120" Opacity="0.85"/>
-                    </Grid>
-
                     <DockPanel LastChildFill="True">
-                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
-                            <TextBlock Text="Queue" VerticalAlignment="Center" Opacity="0.85"/>
-                            <Button Content="Clear" Command="{Binding ClearQueueCommand}" IsEnabled="{Binding CanClearQueue}"/>
-                            <Button Content="Remove" Command="{Binding RemoveSelectedQueueItemCommand}" IsEnabled="{Binding CanRemoveQueueItem}"/>
+                        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,4">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Queue" VerticalAlignment="Center" Opacity="0.85"/>
+                                <Button Content="Save…" Command="{Binding SavePlaylistCommand}" IsEnabled="{Binding HasQueueItems}"/>
+                                <Button Content="Manage…" Command="{Binding OpenPlaylistManagerCommand}"/>
+                                <Button Content="Clear" Command="{Binding ClearQueueCommand}" IsEnabled="{Binding CanClearQueue}"/>
+                                <Button Content="Remove" Command="{Binding RemoveSelectedQueueItemCommand}" IsEnabled="{Binding CanRemoveQueueItem}"/>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding SavedPlaylists.Count}">
+                                <ComboBox Grid.Column="0"
+                                          ItemsSource="{Binding SavedPlaylists}"
+                                          SelectedItem="{Binding SelectedSavedPlaylist}"
+                                          PlaceholderText="Saved playlists">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate DataType="models:SavedPlaylistSummary">
+                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="1" Content="Load" Command="{Binding LoadPlaylistCommand}" CommandParameter="{Binding SelectedSavedPlaylist}"/>
+                                <Button Grid.Column="2" Content="Append" Command="{Binding AppendPlaylistCommand}" CommandParameter="{Binding SelectedSavedPlaylist}"/>
+                                <Button Grid.Column="3" Content="Play now" Command="{Binding PlayPlaylistNowCommand}" CommandParameter="{Binding SelectedSavedPlaylist}"/>
+                            </Grid>
                         </StackPanel>
                         <ListBox x:Name="QueueListBox"
                                  ItemsSource="{Binding QueueItems}"
@@ -197,17 +213,15 @@
                 IsVisible="{Binding IsSoundboardVisible}">
             <Border DataContext="{Binding Soundboard}" x:DataType="vm:SoundboardViewModel">
             <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
-                    <TextBlock Text="Soundboard" FontSize="16" FontWeight="SemiBold"/>
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                        <TextBlock Grid.Column="0" Text="Volume" VerticalAlignment="Center"/>
-                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}" TickFrequency="10"/>
-                        <TextBlock Grid.Column="2" Text="{Binding Volume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
-                    </Grid>
-                </StackPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Soundboard" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
 
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding Pads}">
+                        <ItemsControl.Styles>
+                            <Style Selector="Border.playing">
+                                <Setter Property="Background" Value="#334285F4"/>
+                            </Style>
+                        </ItemsControl.Styles>
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Rows="4" Columns="3"/>
@@ -216,7 +230,8 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SoundboardPadViewModel">
                                 <Border Margin="3" Padding="6" CornerRadius="6" BorderThickness="{Binding HighlightBorderThickness}"
-                                        BorderBrush="{DynamicResource SystemAccentColor}">
+                                        BorderBrush="{DynamicResource SystemAccentColor}"
+                                        Classes.playing="{Binding IsPlaying}">
                                     <StackPanel Spacing="3">
                                         <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Text="{Binding FileNameDisplay}" FontSize="10" Opacity="0.75" TextTrimming="CharacterEllipsis"/>

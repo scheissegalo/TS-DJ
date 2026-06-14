@@ -13,21 +13,16 @@ public partial class NavidromeBrowserViewModel : ViewModelBase
     private readonly INavidromeMediaQueueService _mediaQueueService;
     private readonly ISettingsService _settingsService;
     private readonly ILogService _logService;
-
-    [ObservableProperty]
-    private string _serverUrl = "http://10.0.0.1:4533";
-
-    [ObservableProperty]
-    private string _username = string.Empty;
-
-    [ObservableProperty]
-    private string _password = string.Empty;
+    private NavidromeSettings _settings = new();
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
 
     [ObservableProperty]
     private string _connectionStatus = "Not connected";
+
+    [ObservableProperty]
+    private string _credentialsHint = "Configure server URL and credentials in Options → Navidrome.";
 
     [ObservableProperty]
     private bool _isConnected;
@@ -112,13 +107,11 @@ public partial class NavidromeBrowserViewModel : ViewModelBase
     {
         try
         {
-            var settings = await _settingsService.LoadNavidromeSettingsAsync();
-            ServerUrl = settings.ServerUrl;
-            Username = settings.Username;
-            Password = settings.Password;
+            _settings = await _settingsService.LoadNavidromeSettingsAsync();
+            UpdateCredentialsHint();
 
-            if (!string.IsNullOrWhiteSpace(settings.Username))
-                await ConnectInternalAsync(persistSettings: false);
+            if (!string.IsNullOrWhiteSpace(_settings.Username))
+                await ConnectInternalAsync();
         }
         catch (Exception ex)
         {
@@ -126,29 +119,36 @@ public partial class NavidromeBrowserViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
-    private async Task ConnectAsync() => await ConnectInternalAsync(persistSettings: true);
+    private void UpdateCredentialsHint()
+    {
+        CredentialsHint = string.IsNullOrWhiteSpace(_settings.Username)
+            ? "Configure server URL and credentials in Options → Navidrome."
+            : $"Using {_settings.Username} @ {NormalizeDisplayUrl(_settings.ServerUrl)} — edit credentials in Options → Navidrome.";
+    }
 
-    private async Task ConnectInternalAsync(bool persistSettings)
+    [RelayCommand]
+    private async Task ConnectAsync() => await ConnectInternalAsync();
+
+    private async Task ConnectInternalAsync()
     {
         IsBusy = true;
         NotifyActionStateChanged();
 
         try
         {
-            var settings = new NavidromeSettings
+            _settings = await _settingsService.LoadNavidromeSettingsAsync();
+            UpdateCredentialsHint();
+
+            if (string.IsNullOrWhiteSpace(_settings.Username))
             {
-                ServerUrl = ServerUrl,
-                Username = Username,
-                Password = Password
-            };
+                ConnectionStatus = "Not configured — set credentials in Options";
+                IsConnected = false;
+                return;
+            }
 
-            await _navidromeService.AuthenticateAsync(settings);
+            await _navidromeService.AuthenticateAsync(_settings);
             IsConnected = true;
-            ConnectionStatus = $"Connected to {NormalizeDisplayUrl(settings.ServerUrl)}";
-
-            if (persistSettings)
-                await _settingsService.SaveNavidromeSettingsAsync(settings);
+            ConnectionStatus = $"Connected to {NormalizeDisplayUrl(_settings.ServerUrl)}";
 
             await LoadPlaylistsAsync();
         }
