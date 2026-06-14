@@ -13,7 +13,23 @@ TeamSpeak 3 DJ client — streams local audio files and Navidrome library tracks
 
 ## Screenshots
 
-No screenshots are committed yet. Add PNG captures under [`docs/screenshots/`](docs/screenshots/) and link them here.
+### Main window
+
+TeamSpeak connection, playback queue, and log panel.
+
+![Main window](screenshots/main_window.png)
+
+### Navidrome browser
+
+Browse and queue tracks from a Subsonic-compatible Navidrome server.
+
+![Navidrome library browser](screenshots/navidrome.png)
+
+### Soundboard pad settings
+
+Per-pad audio file, volume, and hotkey configuration.
+
+![Soundboard pad settings](screenshots/soundboard_settings.png)
 
 ## Requirements
 

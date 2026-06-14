@@ -1,17 +1,9 @@
 # Screenshots
 
-Add application screenshots here for the README.
+Application screenshots live in the repo root [`screenshots/`](../screenshots/) directory and are embedded in the main [README.md](../README.md).
 
-Suggested captures:
+- `main_window.png` — main window (connection, queue, log)
+- `navidrome.png` — Navidrome library browser
+- `soundboard_settings.png` — soundboard pad settings
 
-- Main window (connected, queue populated)
-- Navidrome browser window
-- Soundboard panel
-
-Use PNG format. Name files descriptively, e.g. `main-window.png`, `navidrome-browser.png`.
-
-After adding images, reference them from the root [README.md](../../README.md):
-
-```markdown
-![Main window](docs/screenshots/main-window.png)
-```
+When adding new captures, place PNG files in `screenshots/` and update the README Screenshots section.
