@@ -38,7 +38,10 @@ public partial class App : Application
                 services.AddTsDjAudio();
                 services.AddSingleton<NavidromeMediaQueueService>();
                 services.AddSingleton<INavidromeMediaQueueService>(sp => sp.GetRequiredService<NavidromeMediaQueueService>());
+                services.AddSingleton<YoutubeMediaQueueService>();
+                services.AddSingleton<IYoutubeMediaQueueService>(sp => sp.GetRequiredService<YoutubeMediaQueueService>());
                 services.AddTransient<NavidromeBrowserViewModel>();
+                services.AddTransient<YouTubeUrlDialogViewModel>();
                 services.AddSingleton<ConnectionProfileSelectorViewModel>();
                 services.AddSingleton<SoundboardViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
@@ -48,6 +51,7 @@ public partial class App : Application
                 services.AddTransient<TeamSpeakConnectionsOptionsViewModel>();
                 services.AddTransient<AudioOptionsViewModel>();
                 services.AddTransient<NavidromeOptionsViewModel>();
+                services.AddTransient<YtDlpOptionsViewModel>();
                 services.AddTransient<SoundboardOptionsViewModel>();
                 services.AddTransient<UiPreferencesOptionsViewModel>();
                 services.AddTransient<PlaylistManagerViewModel>();

@@ -143,23 +143,21 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         return Task.CompletedTask;
     }
 
-    public Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default)
+    public async Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default)
     {
         if (!_teamSpeak.Client.Connected)
         {
             _logger.LogWarning("Cannot play queue item — not connected to TeamSpeak");
-            return Task.CompletedTask;
+            return;
         }
 
-        _mixer.PlayQueueItem(index);
+        await _mixer.PlayQueueItemAsync(index, cancellationToken);
 
         if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
         {
             SetState(PlaybackState.Playing);
-            _logger.LogInformation("PlayQueueItem started: {FilePath}", _mixer.NowPlaying.FilePath);
+            _logger.LogInformation("PlayQueueItem started: {SourceKey}", _mixer.NowPlaying.SourceKey);
         }
-
-        return Task.CompletedTask;
     }
 
     public Task SkipNextAsync(CancellationToken cancellationToken = default)

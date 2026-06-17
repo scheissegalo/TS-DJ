@@ -37,5 +37,14 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/Views/NavidromeBrowserWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/Views/OptionsWindow.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/Views/PlaylistManagerDialog.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/Views/SavePlaylistDialog.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/Views/SoundboardPadSettingsWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

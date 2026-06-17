@@ -7,6 +7,7 @@ TeamSpeak 3 DJ client — streams local audio files and Navidrome library tracks
 - **TeamSpeak 3 streaming** — connect as a bot, select a channel, encode voice as Opus
 - **Playlist and queue** — enqueue tracks, skip, reorder, play now
 - **Navidrome integration** — browse/search Subsonic-compatible libraries; queue albums, artists, playlists, or tracks
+- **YouTube URLs** — paste a video link to resolve metadata, queue, play, and save in playlists via bundled yt-dlp
 - **Soundboard** — 12 pads with per-pad audio, volume, and hotkeys
 - **Metadata sync** — track title/artist updates on the TS client nickname or description where supported
 - **Linux desktop integration** — user-local install script with `.desktop` entry, icons, and CLI wrapper
@@ -97,6 +98,22 @@ Open **Navidrome…** from the playback panel (requires an active TS connection)
 
 Navidrome exposes a Subsonic-compatible API; any compatible server may work but Navidrome is the tested target.
 
+## YouTube
+
+Open **YouTube…** from the playback panel (requires an active TS connection). Paste a single video URL (`youtube.com/watch`, `youtu.be`, or `music.youtube.com`). TS-DJ resolves title, uploader, and duration via yt-dlp, then either adds the track to the queue or starts playback immediately.
+
+Saved playlists store the canonical video URL and metadata — not temporary stream URLs. On playback, audio is re-resolved through yt-dlp.
+
+**yt-dlp location** (checked in order):
+
+1. Optional path in **Options → YouTube / yt-dlp**
+2. Bundled binary under `tools/yt-dlp/` next to the application
+3. `yt-dlp` on `PATH`
+
+Linux release builds include the bundled yt-dlp binary. Windows builds use a configured path or PATH until a Windows binary is bundled.
+
+Playback buffers MP3 in memory after yt-dlp extracts via a short-lived temp file (FFmpeg cannot transcode to stdout with the bundled yt-dlp workflow).
+
 ## Build from source
 
 ```bash
@@ -153,7 +170,17 @@ See [`CHANGELOG.md`](CHANGELOG.md) for version history.
 Audio source → NAudio decoder → mixer/queue → VolumePipe → Opus encoder → TeamSpeak voice
 ```
 
-Local files (MP3, FLAC, etc.) and Navidrome HTTP streams feed the same queue and encoder path.
+Local files (MP3, FLAC, etc.), Navidrome HTTP streams, and YouTube URLs (via yt-dlp MP3 stdout) feed the same queue and encoder path.
+
+### Media sources
+
+| Source | Identity in queue | Playback resolution |
+|--------|-------------------|---------------------|
+| Local file | File path | Direct file decode |
+| Navidrome | Subsonic track ID | Fresh authenticated stream URL at play time |
+| YouTube | Canonical video URL | yt-dlp metadata at paste; MP3 audio buffered in memory at play time |
+
+Browser extensions or a local HTTP API can reuse `YoutubeMediaQueueService` / `IMediaSource` without new playback code.
 
 ## License
 

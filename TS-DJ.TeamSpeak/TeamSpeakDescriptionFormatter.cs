@@ -50,7 +50,12 @@ public static class TeamSpeakDescriptionFormatter
         if (bitrateKbps is > 0)
             extras.Add($"{bitrateKbps} kbps");
 
-        extras.Add(item.SourceKind == PlaybackSourceKind.LocalFile ? "Local" : "Navidrome");
+        extras.Add(item.SourceKind switch
+        {
+            PlaybackSourceKind.LocalFile => "Local",
+            PlaybackSourceKind.YouTube => "YouTube",
+            _ => "Navidrome"
+        });
 
         return extras;
     }

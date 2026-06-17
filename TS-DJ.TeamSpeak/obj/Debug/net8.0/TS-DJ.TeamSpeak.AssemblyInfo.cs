@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TS-DJ.TeamSpeak")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.3.3.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.3.3+d0f1aa4beed0728f22601e6231bc37c7df42ae46")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.3.3+23cf202d80501a0f0d7930a3491925632a327cce")]
 [assembly: System.Reflection.AssemblyProductAttribute("TS-DJ.TeamSpeak")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TS-DJ.TeamSpeak")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.3.3.0")]

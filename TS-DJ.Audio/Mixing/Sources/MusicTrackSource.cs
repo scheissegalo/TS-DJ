@@ -101,6 +101,10 @@ public sealed class MusicTrackSource : IMusicTrackSource
                 _decoder.Open(item.FilePath);
                 _currentSourceKey = item.SourceKey;
             }
+            else if (item.SourceKind == PlaybackSourceKind.YouTube)
+            {
+                throw new InvalidOperationException("YouTube items require a buffered stream handle.");
+            }
             else
             {
                 var streamUrl = resolvedStreamUrl
@@ -116,6 +120,30 @@ public sealed class MusicTrackSource : IMusicTrackSource
             RebindMixerInputLocked();
             _logger.LogInformation(
                 "Music track opened: {SourceKey} (duration {Duration:F1}s)",
+                _currentSourceKey, _decoder.TotalTime.TotalSeconds);
+        }
+    }
+
+    public void OpenPlaybackItem(PlaybackQueueItem item, IPlaybackStreamHandle streamHandle)
+    {
+        ArgumentNullException.ThrowIfNull(streamHandle);
+
+        lock (_sync)
+        {
+            StopInternal(logStop: false);
+
+            _decoder = new AudioFileDecoder();
+            var duration = item.DurationSeconds is > 0
+                ? TimeSpan.FromSeconds(item.DurationSeconds.Value)
+                : (TimeSpan?)null;
+
+            _decoder.OpenStream(streamHandle.OpenRead(), duration);
+            _currentSourceKey = item.SourceKey;
+
+            _switchable.SetSource(_decoder.Output);
+            RebindMixerInputLocked();
+            _logger.LogInformation(
+                "Music track opened from stream: {SourceKey} (duration {Duration:F1}s)",
                 _currentSourceKey, _decoder.TotalTime.TotalSeconds);
         }
     }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using TS_DJ.Audio.Mixing.Sources;
+using TS_DJ.Audio.Playback;
 using TS_DJ.Core.Audio;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
@@ -15,7 +16,10 @@ public sealed class AudioMixerService : IAudioMixerService
     private readonly ILogger<AudioMixerService> _logger;
     private readonly AudioPipeline _pipeline;
     private readonly TeamSpeakService _teamSpeak;
-    private readonly IPlaybackStreamUrlProvider? _streamUrlProvider;
+    private readonly IMediaSourceRegistry? _mediaRegistry;
+    private readonly IPlaybackStreamResolver? _streamResolver;
+    private readonly IPlaybackStreamOpener? _streamOpener;
+    private readonly PlaybackStreamPrefetchCache? _prefetchCache;
     private readonly object _sync = new();
     private readonly MixingSampleProvider _mixer;
     private readonly MixerOutputProducer _outputProducer;
@@ -36,9 +40,15 @@ public sealed class AudioMixerService : IAudioMixerService
         ILogger<MixerOutputProducer> outputLogger,
         TeamSpeakService teamSpeak,
         Id pipelineId,
-        IPlaybackStreamUrlProvider? streamUrlProvider = null)
+        IMediaSourceRegistry? mediaRegistry = null,
+        IPlaybackStreamResolver? streamResolver = null,
+        IPlaybackStreamOpener? streamOpener = null,
+        PlaybackStreamPrefetchCache? prefetchCache = null)
     {
-        _streamUrlProvider = streamUrlProvider;
+        _mediaRegistry = mediaRegistry;
+        _streamResolver = streamResolver;
+        _streamOpener = streamOpener;
+        _prefetchCache = prefetchCache;
         _logger = logger;
         _teamSpeak = teamSpeak;
 
@@ -185,6 +195,8 @@ public sealed class AudioMixerService : IAudioMixerService
                 SourceKind = item.SourceKind,
                 FilePath = item.FilePath,
                 RemoteTrackId = item.RemoteTrackId,
+                VideoUrl = item.VideoUrl,
+                ThumbnailUrl = item.ThumbnailUrl,
                 DisplayName = item.DisplayName,
                 Artist = item.Artist,
                 Album = item.Album,
@@ -197,6 +209,7 @@ public sealed class AudioMixerService : IAudioMixerService
                 item.SourceKey, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
         }
 
+        _prefetchCache?.StartPrefetch(item);
         RaiseQueueChanged();
     }
 
@@ -204,23 +217,28 @@ public sealed class AudioMixerService : IAudioMixerService
     {
         ArgumentNullException.ThrowIfNull(items);
 
+        var enqueued = new List<PlaybackQueueItem>();
         lock (_sync)
         {
             var added = 0;
             foreach (var item in items)
             {
                 ValidateQueueItem(item);
-                _queue.Add(new PlaybackQueueItem
+                var clone = new PlaybackQueueItem
                 {
                     SourceKind = item.SourceKind,
                     FilePath = item.FilePath,
                     RemoteTrackId = item.RemoteTrackId,
+                    VideoUrl = item.VideoUrl,
+                    ThumbnailUrl = item.ThumbnailUrl,
                     DisplayName = item.DisplayName,
                     Artist = item.Artist,
                     Album = item.Album,
                     DurationSeconds = item.DurationSeconds,
                     Status = PlaybackQueueStatus.Queued
-                });
+                };
+                _queue.Add(clone);
+                enqueued.Add(clone);
                 added++;
             }
 
@@ -229,11 +247,21 @@ public sealed class AudioMixerService : IAudioMixerService
                 added, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
         }
 
+        foreach (var item in enqueued)
+            _prefetchCache?.StartPrefetch(item);
+
         RaiseQueueChanged();
     }
 
     private void ValidateQueueItem(PlaybackQueueItem item)
     {
+        var source = _mediaRegistry?.FindForItem(item);
+        if (source is not null)
+        {
+            source.ValidateForEnqueue(item);
+            return;
+        }
+
         if (item.SourceKind == PlaybackSourceKind.LocalFile)
         {
             if (!File.Exists(item.FilePath))
@@ -248,14 +276,24 @@ public sealed class AudioMixerService : IAudioMixerService
             return;
         }
 
+        if (item.SourceKind == PlaybackSourceKind.YouTube)
+        {
+            if (string.IsNullOrWhiteSpace(item.VideoUrl))
+                throw new ArgumentException("YouTube queue items require a video URL.", nameof(item));
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(item.RemoteTrackId))
             throw new ArgumentException("Remote queue items require a track id.", nameof(item));
 
-        if (_streamUrlProvider is null)
+        if (_streamResolver is null)
             throw new InvalidOperationException("Remote playback is not configured.");
     }
 
-    private void OpenQueueItemLocked(PlaybackQueueItem item)
+    private void OpenQueueItemLocked(
+        PlaybackQueueItem item,
+        string? resolvedStreamUrl = null,
+        IPlaybackStreamHandle? openedStream = null)
     {
         if (item.SourceKind == PlaybackSourceKind.LocalFile)
         {
@@ -263,7 +301,21 @@ public sealed class AudioMixerService : IAudioMixerService
             return;
         }
 
-        var streamUrl = _streamUrlProvider?.TryGetStreamUrl(item);
+        if (item.SourceKind == PlaybackSourceKind.YouTube)
+        {
+            var handle = openedStream;
+            if (handle is null && (_prefetchCache is null || !_prefetchCache.TryTakeReady(item, out handle)))
+                throw new InvalidOperationException("YouTube stream is not ready.");
+
+            if (handle is null)
+                throw new InvalidOperationException("Could not open YouTube stream.");
+
+            Music.OpenPlaybackItem(item, handle);
+            return;
+        }
+
+        var streamUrl = resolvedStreamUrl
+            ?? _streamResolver?.ResolveStreamUrlAsync(item).GetAwaiter().GetResult();
         if (string.IsNullOrWhiteSpace(streamUrl))
             throw new InvalidOperationException("Could not resolve remote stream URL.");
 
@@ -351,9 +403,164 @@ public sealed class AudioMixerService : IAudioMixerService
 
         if (started)
         {
+            PrefetchNextQueuedLocked();
             RaiseNowPlayingChanged();
             RaiseQueueChanged();
         }
+    }
+
+    public async Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default)
+    {
+        PlaybackQueueItem target;
+        lock (_sync)
+        {
+            if (index < 0 || index >= _queue.Count)
+                return;
+
+            target = _queue[index];
+            if (target.Status == PlaybackQueueStatus.Playing)
+                return;
+        }
+
+        if (target.SourceKind == PlaybackSourceKind.YouTube)
+        {
+            await PlayYouTubeQueueItemAsync(index, target, cancellationToken);
+            return;
+        }
+
+        if (target.SourceKind == PlaybackSourceKind.RemoteStream)
+        {
+            var streamUrl = _streamResolver is null
+                ? null
+                : await _streamResolver.ResolveStreamUrlAsync(target, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(streamUrl))
+            {
+                _logger.LogError("Failed to resolve stream URL for {SourceKey}", target.SourceKey);
+                MarkQueueItemFailedLocked(index);
+                return;
+            }
+
+            PlayQueueItemWithResolvedMedia(index, streamUrl, null);
+            return;
+        }
+
+        PlayQueueItem(index);
+    }
+
+    private async Task PlayYouTubeQueueItemAsync(
+        int index,
+        PlaybackQueueItem target,
+        CancellationToken cancellationToken)
+    {
+        IPlaybackStreamHandle? handle = null;
+        if (_prefetchCache?.TryTakeReady(target, out handle) != true || handle is null)
+        {
+            if (_streamOpener is null)
+            {
+                MarkQueueItemFailedLocked(index);
+                return;
+            }
+
+            try
+            {
+                handle = await _streamOpener.OpenPlaybackStreamAsync(target, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to open YouTube stream for {SourceKey}", target.SourceKey);
+                MarkQueueItemFailedLocked(index);
+                return;
+            }
+        }
+
+        if (handle is null)
+        {
+            MarkQueueItemFailedLocked(index);
+            return;
+        }
+
+        PlayQueueItemWithResolvedMedia(index, null, handle);
+    }
+
+    private void PlayQueueItemWithResolvedMedia(
+        int index,
+        string? resolvedStreamUrl,
+        IPlaybackStreamHandle? openedStream)
+    {
+        bool started;
+        lock (_sync)
+        {
+            if (index < 0 || index >= _queue.Count)
+            {
+                openedStream?.Dispose();
+                return;
+            }
+
+            var target = _queue[index];
+            if (target.Status == PlaybackQueueStatus.Playing)
+            {
+                openedStream?.Dispose();
+                return;
+            }
+
+            PushCurrentToHistoryLocked();
+            DemoteCurrentPlayingLocked();
+
+            target.Status = PlaybackQueueStatus.Playing;
+            _nowPlaying = target;
+
+            try
+            {
+                OpenQueueItemLocked(target, resolvedStreamUrl, openedStream);
+                Music.Play();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to play queue item at index {Index}: {SourceKey}", index, target.SourceKey);
+                target.Status = PlaybackQueueStatus.Failed;
+                _nowPlaying = null;
+                openedStream?.Dispose();
+                RaiseQueueChanged();
+                return;
+            }
+
+            if (!_pipeline.IsTransmitting)
+                BeginTransmissionLocked();
+            else
+                _pipeline.ResyncForNewTrack();
+
+            started = true;
+            _logger.LogInformation("PlayQueueItem index {Index}: {SourceKey}", index, target.SourceKey);
+        }
+
+        if (started)
+        {
+            PrefetchNextQueuedLocked();
+            RaiseNowPlayingChanged();
+            RaiseQueueChanged();
+        }
+    }
+
+    private void MarkQueueItemFailedLocked(int index)
+    {
+        lock (_sync)
+        {
+            if (index < 0 || index >= _queue.Count)
+                return;
+
+            _queue[index].Status = PlaybackQueueStatus.Failed;
+            RaiseQueueChanged();
+        }
+    }
+
+    private void PrefetchNextQueuedLocked()
+    {
+        if (_prefetchCache is null)
+            return;
+
+        lock (_sync)
+            _prefetchCache.PrefetchNextQueued(_queue);
     }
 
     public void SkipNext()
@@ -505,6 +712,8 @@ public sealed class AudioMixerService : IAudioMixerService
             SourceKind = item.SourceKind,
             FilePath = item.FilePath,
             RemoteTrackId = item.RemoteTrackId,
+            VideoUrl = item.VideoUrl,
+            ThumbnailUrl = item.ThumbnailUrl,
             DisplayName = item.DisplayName,
             Artist = item.Artist,
             Album = item.Album,
@@ -708,11 +917,12 @@ public sealed class AudioMixerService : IAudioMixerService
                     if (!_pipeline.IsTransmitting)
                         BeginTransmissionLocked(forSoundboardOnly: true);
                 }
-                else
+                else if (!HasPendingYouTubeAdvanceLocked())
                     EnterIdleLocked("queue advance failed");
             }
             else
             {
+                PrefetchNextQueuedLocked();
                 _pipeline.ResyncForNewTrack();
                 if (!_pipeline.IsTransmitting)
                     BeginTransmissionLocked();
@@ -759,6 +969,39 @@ public sealed class AudioMixerService : IAudioMixerService
                     item.Status = PlaybackQueueStatus.Queued;
             }
 
+            if (next.SourceKind == PlaybackSourceKind.YouTube)
+            {
+                if (_prefetchCache is null || !_prefetchCache.TryTakeReady(next, out var youtubeHandle) || youtubeHandle is null)
+                {
+                    ScheduleAsyncYouTubeAdvance();
+                    return false;
+                }
+
+                next.Status = PlaybackQueueStatus.Playing;
+                _nowPlaying = next;
+
+                try
+                {
+                    OpenQueueItemLocked(next, openedStream: youtubeHandle);
+                    Music.Play();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to open/play queued YouTube track: {SourceKey}", next.SourceKey);
+                    next.Status = PlaybackQueueStatus.Failed;
+                    _nowPlaying = null;
+                    skipped++;
+                    ScheduleAsyncYouTubeAdvance();
+                    continue;
+                }
+
+                PrefetchNextQueuedLocked();
+                _logger.LogInformation(
+                    "Now playing: {SourceKey} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
+                    next.SourceKey, Music.IsPlaying, _pipeline.IsTransmitting);
+                return true;
+            }
+
             next.Status = PlaybackQueueStatus.Playing;
             _nowPlaying = next;
 
@@ -773,8 +1016,14 @@ public sealed class AudioMixerService : IAudioMixerService
                 next.Status = PlaybackQueueStatus.Failed;
                 _nowPlaying = null;
                 skipped++;
+
+                if (next.SourceKind == PlaybackSourceKind.YouTube)
+                    ScheduleAsyncYouTubeAdvance();
+
                 continue;
             }
+
+            PrefetchNextQueuedLocked();
 
             if (skipped > 0)
             {
@@ -873,6 +1122,36 @@ public sealed class AudioMixerService : IAudioMixerService
     private void RaiseQueueChanged() => QueueChanged?.Invoke(this, EventArgs.Empty);
 
     private void RaiseNowPlayingChanged() => NowPlayingChanged?.Invoke(this, EventArgs.Empty);
+
+    private bool HasPendingYouTubeAdvanceLocked()
+    {
+        var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+        return next?.SourceKind == PlaybackSourceKind.YouTube;
+    }
+
+    private void ScheduleAsyncYouTubeAdvance()
+    {
+        if (_streamOpener is null)
+            return;
+
+        _ = Task.Run(async () =>
+        {
+            int index;
+            PlaybackQueueItem target;
+            lock (_sync)
+            {
+                index = _queue.FindIndex(item => item.Status == PlaybackQueueStatus.Queued);
+                if (index < 0)
+                    return;
+
+                target = _queue[index];
+                if (target.SourceKind != PlaybackSourceKind.YouTube)
+                    return;
+            }
+
+            await PlayYouTubeQueueItemAsync(index, target, CancellationToken.None);
+        });
+    }
 
     public void Dispose()
     {

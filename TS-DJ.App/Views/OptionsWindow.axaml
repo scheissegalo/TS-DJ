@@ -102,6 +102,26 @@
             </StackPanel>
         </DataTemplate>
 
+        <DataTemplate DataType="vm:YtDlpOptionsViewModel">
+            <StackPanel Spacing="12" MaxWidth="520">
+                <TextBlock Text="YouTube / yt-dlp" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="Optional override for the yt-dlp executable. Leave empty to use the bundled binary or PATH."
+                           TextWrapping="Wrap" Opacity="0.75"/>
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Executable path" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ExecutablePath}" PlaceholderText="Optional"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Resolved" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ResolvedPathDisplay}" TextWrapping="Wrap" Opacity="0.85"/>
+
+                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Test yt-dlp" Command="{Binding TestYtDlpCommand}"/>
+                        <TextBlock Text="{Binding TestResult}" VerticalAlignment="Center" Opacity="0.85"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
         <DataTemplate DataType="vm:SoundboardOptionsViewModel">
             <StackPanel Spacing="12">
                 <TextBlock Text="Soundboard settings" FontSize="16" FontWeight="SemiBold"/>

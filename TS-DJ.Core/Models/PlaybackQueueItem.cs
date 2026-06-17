@@ -13,6 +13,8 @@ public sealed class PlaybackQueueItem
     public PlaybackSourceKind SourceKind { get; init; } = PlaybackSourceKind.LocalFile;
     public string FilePath { get; init; } = string.Empty;
     public string? RemoteTrackId { get; init; }
+    public string? VideoUrl { get; init; }
+    public string? ThumbnailUrl { get; init; }
     public string DisplayName { get; init; } = string.Empty;
     public string? Artist { get; init; }
     public string? Album { get; init; }
@@ -23,9 +25,12 @@ public sealed class PlaybackQueueItem
     /// Stable key for queue identity, play history, and logging (never contains passwords).
     /// </summary>
     public string SourceKey =>
-        SourceKind == PlaybackSourceKind.LocalFile
-            ? FilePath
-            : RemoteTrackId ?? DisplayName;
+        SourceKind switch
+        {
+            PlaybackSourceKind.LocalFile => FilePath,
+            PlaybackSourceKind.YouTube => VideoUrl ?? DisplayName,
+            _ => RemoteTrackId ?? DisplayName
+        };
 
     public static PlaybackQueueItem FromLocalFile(string filePath, string? displayName = null) =>
         new()

@@ -13,6 +13,7 @@ public partial class OptionsViewModel : ViewModelBase
         new(OptionsSection.TeamSpeakConnections, "TeamSpeak"),
         new(OptionsSection.Audio, "Audio"),
         new(OptionsSection.Navidrome, "Navidrome"),
+        new(OptionsSection.YouTube, "YouTube / yt-dlp"),
         new(OptionsSection.Soundboard, "Soundboard"),
         new(OptionsSection.UiPreferences, "UI / Preferences")
     ];
@@ -20,6 +21,7 @@ public partial class OptionsViewModel : ViewModelBase
     public TeamSpeakConnectionsOptionsViewModel TeamSpeak { get; }
     public AudioOptionsViewModel Audio { get; }
     public NavidromeOptionsViewModel Navidrome { get; }
+    public YtDlpOptionsViewModel YouTube { get; }
     public SoundboardOptionsViewModel Soundboard { get; }
     public UiPreferencesOptionsViewModel UiPreferences { get; }
 
@@ -31,6 +33,7 @@ public partial class OptionsViewModel : ViewModelBase
         OptionsSection.TeamSpeakConnections => TeamSpeak,
         OptionsSection.Audio => Audio,
         OptionsSection.Navidrome => Navidrome,
+        OptionsSection.YouTube => YouTube,
         OptionsSection.Soundboard => Soundboard,
         OptionsSection.UiPreferences => UiPreferences,
         _ => null
@@ -40,12 +43,14 @@ public partial class OptionsViewModel : ViewModelBase
         TeamSpeakConnectionsOptionsViewModel teamSpeak,
         AudioOptionsViewModel audio,
         NavidromeOptionsViewModel navidrome,
+        YtDlpOptionsViewModel youTube,
         SoundboardOptionsViewModel soundboard,
         UiPreferencesOptionsViewModel uiPreferences)
     {
         TeamSpeak = teamSpeak;
         Audio = audio;
         Navidrome = navidrome;
+        YouTube = youTube;
         Soundboard = soundboard;
         UiPreferences = uiPreferences;
         SelectedSection = Sections[0];
@@ -56,6 +61,7 @@ public partial class OptionsViewModel : ViewModelBase
         await TeamSpeak.LoadAsync();
         await Audio.LoadAsync();
         await Navidrome.LoadAsync();
+        await YouTube.LoadAsync();
         await Soundboard.LoadAsync();
         await UiPreferences.LoadAsync();
     }

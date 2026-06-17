@@ -5,6 +5,7 @@ public enum OptionsSection
     TeamSpeakConnections,
     Audio,
     Navidrome,
+    YouTube,
     Soundboard,
     UiPreferences
 }

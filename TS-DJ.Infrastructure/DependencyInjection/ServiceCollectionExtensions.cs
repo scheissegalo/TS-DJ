@@ -2,9 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Services;
 using TS_DJ.Infrastructure.Logging;
+using TS_DJ.Infrastructure.Media;
 using TS_DJ.Infrastructure.Navidrome;
 using TS_DJ.Infrastructure.Playlists;
 using TS_DJ.Infrastructure.Settings;
+using TS_DJ.Infrastructure.YtDlp;
 
 namespace TS_DJ.Infrastructure.DependencyInjection;
 
@@ -35,7 +37,16 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<ILogger<NavidromeService>>()));
 
         services.AddSingleton<INavidromeService>(sp => sp.GetRequiredService<NavidromeService>());
-        services.AddSingleton<IPlaybackStreamUrlProvider>(sp => sp.GetRequiredService<NavidromeService>());
+
+        services.AddSingleton<YtDlpLocator>();
+        services.AddSingleton<YtDlpService>();
+        services.AddSingleton<YoutubeMediaSource>();
+        services.AddSingleton<IMediaSource, LocalFileMediaSource>();
+        services.AddSingleton<IMediaSource, NavidromeMediaSource>();
+        services.AddSingleton<IMediaSource>(sp => sp.GetRequiredService<YoutubeMediaSource>());
+        services.AddSingleton<IPlaybackStreamOpener>(sp => sp.GetRequiredService<YoutubeMediaSource>());
+        services.AddSingleton<IMediaSourceRegistry, MediaSourceRegistry>();
+        services.AddSingleton<IPlaybackStreamResolver, CompositePlaybackStreamResolver>();
         services.AddSingleton<IPlaylistService, PlaylistService>();
 
         return services;

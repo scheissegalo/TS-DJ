@@ -624,6 +624,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private void OpenYouTubeDialog()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            return;
+        }
+
+        if (desktop.MainWindow is not Window owner)
+            return;
+
+        var viewModel = App.Services.GetRequiredService<YouTubeUrlDialogViewModel>();
+        var dialog = new Views.YouTubeUrlDialog
+        {
+            DataContext = viewModel
+        };
+
+        dialog.ShowDialog(owner);
+    }
+
+    [RelayCommand]
     private async Task BrowseFileAsync()
     {
         if (Avalonia.Application.Current?.ApplicationLifetime is not

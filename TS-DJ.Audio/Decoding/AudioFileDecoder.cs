@@ -95,6 +95,44 @@ public sealed class AudioFileDecoder : IDisposable
         }
     }
 
+    public void OpenStream(Stream stream, TimeSpan? knownDuration = null)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        DisposeReader();
+        _knownDuration = knownDuration;
+
+        _reader = CreateReaderFromStream(stream);
+        _output = CreateOutputProvider(_reader, knownDuration);
+    }
+
+    private static WaveStream CreateReaderFromStream(Stream stream)
+    {
+        if (!stream.CanSeek)
+            throw new ArgumentException("Stream must be seekable.", nameof(stream));
+
+        var header = new byte[4];
+        var read = stream.Read(header, 0, header.Length);
+        stream.Position = 0;
+
+        if (read >= 3 && header[0] == 'I' && header[1] == 'D' && header[2] == '3')
+            return CreateMp3Reader(stream);
+
+        if (read >= 2 && header[0] == 0xFF && (header[1] & 0xE0) == 0xE0)
+            return CreateMp3Reader(stream);
+
+        if (read >= 4 && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F')
+            return new WaveFileReader(stream);
+
+        if (read >= 4 && header[0] == 0x1A && header[1] == 0x45 && header[2] == 0xDF && header[3] == 0xA3)
+        {
+            throw new NotSupportedException(
+                "Received WebM audio from yt-dlp instead of MP3. FFmpeg extraction may have failed.");
+        }
+
+        return CreateMp3Reader(stream);
+    }
+
     private static WaveStream CreateReader(string filePath)
     {
         return Path.GetExtension(filePath).ToLowerInvariant() switch

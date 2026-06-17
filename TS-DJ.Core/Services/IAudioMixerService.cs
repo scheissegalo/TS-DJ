@@ -22,6 +22,7 @@ public interface IAudioMixerService : IDisposable
     void RemoveFromQueue(int index);
     void ClearQueue();
     void PlayQueueItem(int index);
+    Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default);
     void SkipNext();
     void SkipPrevious();
     bool CanSkipPrevious { get; }

@@ -7,7 +7,7 @@ using TS_DJ.Core.Services;
 
 namespace TS_DJ.Infrastructure.Navidrome;
 
-public sealed class NavidromeService : INavidromeService, IPlaybackStreamUrlProvider
+public sealed class NavidromeService : INavidromeService
 {
     public const string HttpClientName = "Navidrome";
 
@@ -231,17 +231,6 @@ public sealed class NavidromeService : INavidromeService, IPlaybackStreamUrlProv
             DurationSeconds = track.DurationSeconds,
             Status = PlaybackQueueStatus.Queued
         };
-    }
-
-    public string? TryGetStreamUrl(PlaybackQueueItem item)
-    {
-        if (item.SourceKind != PlaybackSourceKind.RemoteStream || string.IsNullOrWhiteSpace(item.RemoteTrackId))
-            return null;
-
-        if (!_authenticated)
-            return null;
-
-        return BuildStreamUrl(item.RemoteTrackId);
     }
 
     private void EnsureAuthenticated()

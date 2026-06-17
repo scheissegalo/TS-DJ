@@ -84,30 +84,49 @@ try
             Artist = "Artist",
             Album = "Album",
             DurationSeconds = 200
+        },
+        new PlaybackQueueItem
+        {
+            SourceKind = PlaybackSourceKind.YouTube,
+            VideoUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            DisplayName = "YouTube Track",
+            Artist = "Uploader",
+            DurationSeconds = 212
         }
     };
 
     var saved = await playlistService.SaveFromQueueAsync("Verify Playlist", queue, "test description");
     var listed = await playlistService.ListAsync();
-    if (listed.Count != 1 || listed[0].Name != "Verify Playlist" || listed[0].EntryCount != 2)
+    if (listed.Count != 1 || listed[0].Name != "Verify Playlist" || listed[0].EntryCount != 3)
     {
         Console.Error.WriteLine("Playlist list mismatch after save.");
         Environment.Exit(1);
     }
 
     var loadedPlaylist = await playlistService.GetAsync(saved.Id);
-    if (loadedPlaylist is null || loadedPlaylist.Entries.Count != 2)
+    if (loadedPlaylist is null || loadedPlaylist.Entries.Count != 3)
     {
         Console.Error.WriteLine("Playlist payload mismatch.");
         Environment.Exit(1);
     }
 
     var resolved = playlistService.ResolveEntries(loadedPlaylist);
-    if (resolved.Count != 2 ||
+    if (resolved.Count != 3 ||
         resolved[0].SourceKind != PlaybackSourceKind.LocalFile ||
-        resolved[1].RemoteTrackId != "remote-1")
+        resolved[1].RemoteTrackId != "remote-1" ||
+        resolved[2].SourceKind != PlaybackSourceKind.YouTube ||
+        resolved[2].VideoUrl != "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     {
         Console.Error.WriteLine("Playlist resolve mismatch.");
+        Environment.Exit(1);
+    }
+
+    var ytdlpSettings = new YtDlpSettings { ExecutablePath = "/usr/bin/yt-dlp" };
+    await service.SaveYtDlpSettingsAsync(ytdlpSettings);
+    var loadedYtdlp = await service.LoadYtDlpSettingsAsync();
+    if (loadedYtdlp.ExecutablePath != "/usr/bin/yt-dlp")
+    {
+        Console.Error.WriteLine("yt-dlp settings round-trip mismatch.");
         Environment.Exit(1);
     }
 

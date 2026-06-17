@@ -19,6 +19,9 @@ public interface ISettingsService
     Task<NavidromeSettings> LoadNavidromeSettingsAsync(CancellationToken cancellationToken = default);
     Task SaveNavidromeSettingsAsync(NavidromeSettings settings, CancellationToken cancellationToken = default);
 
+    Task<YtDlpSettings> LoadYtDlpSettingsAsync(CancellationToken cancellationToken = default);
+    Task SaveYtDlpSettingsAsync(YtDlpSettings settings, CancellationToken cancellationToken = default);
+
     Task<TeamSpeakConnectionProfilesSettings> LoadTeamSpeakConnectionProfilesAsync(CancellationToken cancellationToken = default);
     Task SaveTeamSpeakConnectionProfilesAsync(TeamSpeakConnectionProfilesSettings settings, CancellationToken cancellationToken = default);
 
