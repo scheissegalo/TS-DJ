@@ -918,12 +918,7 @@ public sealed class AudioMixerService : IAudioMixerService
         }
 
         var queuedCount = _queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
-        foreach (var item in _queue)
-        {
-            _logger.LogInformation("  Queue item: {Name} [{Status}]", item.DisplayName, item.Status);
-        }
-
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Queue state after EOF: queued={QueuedCount}, played={PlayedCount}, total={Total}",
             queuedCount,
             _queue.Count(i => i.Status == PlaybackQueueStatus.Played),

@@ -6,6 +6,8 @@ namespace TS_DJ.Infrastructure.Logging;
 
 public sealed class LogService : ILogService
 {
+    public const int MaxLogEntries = 1000;
+
     private readonly List<LogEntry> _entries = [];
     private readonly object _lock = new();
 
@@ -27,7 +29,7 @@ public sealed class LogService : ILogService
         lock (_lock)
         {
             _entries.Add(entry);
-            if (_entries.Count > 1000)
+            if (_entries.Count > MaxLogEntries)
                 _entries.RemoveAt(0);
         }
 

@@ -47,6 +47,8 @@ public partial class App : Application
                 services.AddSingleton<ConnectionProfileSelectorViewModel>();
                 services.AddSingleton<SoundboardViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
+                services.AddSingleton<TrackTransitionProfiler>();
+                services.AddSingleton<ITrackTransitionTiming>(sp => sp.GetRequiredService<TrackTransitionProfiler>());
                 services.AddSingleton<ApplicationShutdownService>();
 
                 services.AddTransient<OptionsViewModel>();

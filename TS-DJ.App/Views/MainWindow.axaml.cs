@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -38,7 +39,6 @@ public partial class MainWindow : Window
         if (_viewModel is not null)
         {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-            _viewModel.QueueScrollTargetChanged -= OnQueueScrollTargetChanged;
             _viewModel.LogEntryAppended -= OnLogEntryAppended;
         }
 
@@ -46,7 +46,6 @@ public partial class MainWindow : Window
         if (_viewModel is not null)
         {
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-            _viewModel.QueueScrollTargetChanged += OnQueueScrollTargetChanged;
             _viewModel.LogEntryAppended += OnLogEntryAppended;
         }
     }
@@ -62,17 +61,23 @@ public partial class MainWindow : Window
         ScrollQueueToPlayingItem(vm.CurrentlyPlayingItem);
     }
 
-    private void OnQueueScrollTargetChanged(object? sender, PlaybackQueueItemViewModel? item) =>
-        ScrollQueueToPlayingItem(item);
-
     private void ScrollQueueToPlayingItem(PlaybackQueueItemViewModel? item)
     {
-        if (item is null)
+        if (_viewModel is null)
             return;
 
+        if (item is null)
+        {
+            _viewModel.TransitionProfiler.MarkUiComplete(TimeSpan.Zero);
+            return;
+        }
+
+        var scrollSw = Stopwatch.StartNew();
         Dispatcher.UIThread.Post(() =>
         {
             QueueListBox.ScrollIntoView(item);
+            scrollSw.Stop();
+            _viewModel.TransitionProfiler.MarkUiComplete(scrollSw.Elapsed);
             _logger.LogDebug("Queue auto-scrolled to {SourceKey}", item.SourceKey);
         }, DispatcherPriority.Background);
     }

@@ -206,13 +206,14 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
     private void OnQueueChanged(object? sender, EventArgs e)
     {
-        var queued = _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
-        var playing = _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Playing);
-        var played = _mixer.Queue.Count(i => i.Status == PlaybackQueueStatus.Played);
+        var queue = _mixer.Queue;
+        var queued = queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
+        var playing = queue.Count(i => i.Status == PlaybackQueueStatus.Playing);
+        var played = queue.Count(i => i.Status == PlaybackQueueStatus.Played);
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "QueueChanged: total={Total}, queued={Queued}, playing={Playing}, played={Played}",
-            _mixer.Queue.Count, queued, playing, played);
+            queue.Count, queued, playing, played);
 
         SyncPlaybackState("QueueChanged");
         TryContinueQueue("QueueChanged");

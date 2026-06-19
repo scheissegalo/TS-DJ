@@ -1,8 +1,8 @@
-Stream Audio Input
+Stream system Audio Input to teamspeak
 2Deck DJ and Playlist mode switch
-add Discord support
-add Mumble support
-Add youtube support - Download and play
+add Discord support - stream to discord server/channels
+add Mumble support - stream to mumble channels
+<!-- Add youtube support - Download and play -->
 <!-- Highlight Playing soundboard item -->
 <!-- Options as seperate window, add teamspeak connections here, options to add multiple servers here stored as favorites. On main window we instead have a dropdown with favorites. -->
 <!-- Playlist management, Save playlists, load playlist. -->

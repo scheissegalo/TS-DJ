@@ -15,7 +15,9 @@ public sealed partial class PlaybackQueueItemViewModel : ObservableObject
 
     public string SourceKey { get; }
     public string FilePath { get; }
-    public string DisplayName { get; }
+
+    [ObservableProperty]
+    private string _displayName;
 
     [ObservableProperty]
     private PlaybackQueueStatus _status;
@@ -26,10 +28,22 @@ public sealed partial class PlaybackQueueItemViewModel : ObservableObject
 
     public string DisplayText => $"{DisplayName} ({StatusText})";
 
+    public void UpdateFrom(PlaybackQueueItem item)
+    {
+        if (DisplayName != item.DisplayName)
+            DisplayName = item.DisplayName;
+
+        if (Status != item.Status)
+            Status = item.Status;
+    }
+
     partial void OnStatusChanged(PlaybackQueueStatus value)
     {
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(DisplayText));
         OnPropertyChanged(nameof(IsCurrentlyPlaying));
     }
+
+    partial void OnDisplayNameChanged(string value) =>
+        OnPropertyChanged(nameof(DisplayText));
 }

@@ -328,3 +328,5 @@
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/yt-dlp/_internal/_brotli.cpython-314-x86_64-linux-gnu.so
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/yt-dlp/_internal/_cffi_backend.cpython-314-x86_64-linux-gnu.so
 /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/js-runtimes/.gitkeep
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/js-runtimes/qjs-linux-x86_64
+/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/js-runtimes/qjs-windows-x86_64.exe

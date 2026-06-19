@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
@@ -7,10 +8,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TS_DJ.App.Services;
 using TS_DJ.Audio;
 using TS_DJ.Core.Audio;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
+using TS_DJ.Infrastructure.Logging;
 using TS_DJ.TeamSpeak;
 
 namespace TS_DJ.App.ViewModels;
@@ -25,10 +28,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ILogService _logService;
     private readonly IPlaylistService _playlistService;
     private readonly TeamSpeakNicknameService _nicknameService;
+    private readonly TrackTransitionProfiler _transitionProfiler;
     private readonly DispatcherTimer _progressTimer;
     private CancellationTokenSource? _volumeSaveDebounceCts;
     private bool _isLoadingSettings;
     private bool _disposed;
+    private bool _playbackUiSyncPending;
+    private bool _playbackUiSyncNeedsProgressReset;
     private string? _lastPlayingSourceKeyForScroll;
 
     [ObservableProperty]
@@ -133,7 +139,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<TeamSpeakChannelInfo> AvailableChannels { get; } = [];
 
     public event EventHandler<LogEntry>? LogEntryAppended;
-    public event EventHandler<PlaybackQueueItemViewModel?>? QueueScrollTargetChanged;
+
+    public TrackTransitionProfiler TransitionProfiler => _transitionProfiler;
+
     public ObservableCollection<PlaybackQueueItemViewModel> QueueItems { get; } = [];
 
     public SoundboardViewModel Soundboard { get; }
@@ -147,6 +155,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ILogService logService,
         IPlaylistService playlistService,
         TeamSpeakNicknameService nicknameService,
+        TrackTransitionProfiler transitionProfiler,
         SoundboardViewModel soundboardViewModel,
         ConnectionProfileSelectorViewModel connectionProfileSelectorViewModel)
     {
@@ -160,6 +169,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _logService = logService;
         _playlistService = playlistService;
         _nicknameService = nicknameService;
+        _transitionProfiler = transitionProfiler;
 
         ConnectionProfiles.PropertyChanged += (_, e) =>
         {
@@ -894,18 +904,39 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         });
     }
 
-    private void OnQueueChanged(object? sender, EventArgs e)
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        SchedulePlaybackUiSync();
+
+    private void OnNowPlayingChanged(object? sender, EventArgs e) =>
+        SchedulePlaybackUiSync(resetProgress: true);
+
+    private void SchedulePlaybackUiSync(bool resetProgress = false)
     {
-        Dispatcher.UIThread.Post(SyncPlaybackUiFromMixer);
+        _playbackUiSyncNeedsProgressReset |= resetProgress;
+
+        if (_playbackUiSyncPending)
+            return;
+
+        _playbackUiSyncPending = true;
+        Dispatcher.UIThread.Post(RunCoalescedPlaybackUiSync, DispatcherPriority.Background);
     }
 
-    private void OnNowPlayingChanged(object? sender, EventArgs e)
+    private void RunCoalescedPlaybackUiSync()
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            SyncPlaybackUiFromMixer();
+        _playbackUiSyncPending = false;
+        var resetProgress = _playbackUiSyncNeedsProgressReset;
+        _playbackUiSyncNeedsProgressReset = false;
+
+        var newPlayingKey = _audioMixerService.NowPlaying?.SourceKey;
+        if (!string.IsNullOrEmpty(newPlayingKey) && newPlayingKey != _lastPlayingSourceKeyForScroll)
+            _transitionProfiler.BeginTransition(newPlayingKey);
+
+        var queueSw = Stopwatch.StartNew();
+        SyncPlaybackUiFromMixer();
+        _transitionProfiler.RecordQueueSync(queueSw.Elapsed);
+
+        if (resetProgress)
             ResetProgressDisplay();
-        });
     }
 
     private void SyncPlaybackUiFromMixer()
@@ -923,6 +954,38 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         var selectedKey = SelectedQueueItem?.SourceKey;
 
+        if (TryUpdateQueueInPlace(queue))
+        {
+            SelectedQueueItem = selectedKey is null
+                ? null
+                : QueueItems.FirstOrDefault(i => i.SourceKey == selectedKey);
+
+            UpdateCurrentlyPlayingItem();
+            return;
+        }
+
+        RebuildQueue(queue, selectedKey);
+    }
+
+    private bool TryUpdateQueueInPlace(IReadOnlyList<PlaybackQueueItem> queue)
+    {
+        if (QueueItems.Count != queue.Count)
+            return false;
+
+        for (var i = 0; i < queue.Count; i++)
+        {
+            if (QueueItems[i].SourceKey != queue[i].SourceKey)
+                return false;
+        }
+
+        foreach (var (viewModel, item) in QueueItems.Zip(queue))
+            viewModel.UpdateFrom(item);
+
+        return true;
+    }
+
+    private void RebuildQueue(IReadOnlyList<PlaybackQueueItem> queue, string? selectedKey)
+    {
         QueueItems.Clear();
         foreach (var item in queue)
             QueueItems.Add(new PlaybackQueueItemViewModel(item));
@@ -931,16 +994,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ? null
             : QueueItems.FirstOrDefault(i => i.SourceKey == selectedKey);
 
+        UpdateCurrentlyPlayingItem();
+    }
+
+    private void UpdateCurrentlyPlayingItem()
+    {
         var playing = QueueItems.FirstOrDefault(i => i.IsCurrentlyPlaying);
         var playingKey = playing?.SourceKey;
 
-        if (playingKey != _lastPlayingSourceKeyForScroll)
-        {
-            _lastPlayingSourceKeyForScroll = playingKey;
-            CurrentlyPlayingItem = playing;
-            _logger.LogDebug("Queue scroll target changed to {SourceKey}", playingKey ?? "none");
-            QueueScrollTargetChanged?.Invoke(this, playing);
-        }
+        if (playingKey == _lastPlayingSourceKeyForScroll)
+            return;
+
+        _lastPlayingSourceKeyForScroll = playingKey;
+        CurrentlyPlayingItem = playing;
+        _logger.LogDebug("Queue scroll target changed to {SourceKey}", playingKey ?? "none");
     }
 
     private void UpdateNowPlayingDisplay()
@@ -1001,6 +1068,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Dispatcher.UIThread.Post(() =>
         {
             LogEntries.Add(entry);
+            while (LogEntries.Count > LogService.MaxLogEntries)
+                LogEntries.RemoveAt(0);
+
             LogEntryAppended?.Invoke(this, entry);
         });
     }

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
 
@@ -12,16 +13,19 @@ public sealed class TeamSpeakDescriptionService
     private readonly ILogger<TeamSpeakDescriptionService> _logger;
     private readonly ITeamSpeakService _teamSpeakService;
     private readonly IAudioMixerService _mixer;
+    private readonly ITrackTransitionTiming? _transitionTiming;
     private string? _lastAppliedSourceKey;
 
     public TeamSpeakDescriptionService(
         ILogger<TeamSpeakDescriptionService> logger,
         ITeamSpeakService teamSpeakService,
-        IAudioMixerService mixer)
+        IAudioMixerService mixer,
+        ITrackTransitionTiming? transitionTiming = null)
     {
         _logger = logger;
         _teamSpeakService = teamSpeakService;
         _mixer = mixer;
+        _transitionTiming = transitionTiming;
 
         _mixer.NowPlayingChanged += OnNowPlayingChanged;
         _teamSpeakService.StateChanged += OnConnectionStateChanged;
@@ -60,7 +64,10 @@ public sealed class TeamSpeakDescriptionService
         if (nowPlaying is null)
         {
             if (_lastAppliedSourceKey is null)
+            {
+                _transitionTiming?.MarkTsDescriptionSkipped();
                 return;
+            }
 
             _lastAppliedSourceKey = null;
             await ApplyDescriptionAsync(string.Empty, sourceKey: null, cancellationToken);
@@ -68,7 +75,10 @@ public sealed class TeamSpeakDescriptionService
         }
 
         if (_lastAppliedSourceKey == nowPlaying.SourceKey)
+        {
+            _transitionTiming?.MarkTsDescriptionSkipped();
             return;
+        }
 
         string description;
         try
@@ -92,8 +102,12 @@ public sealed class TeamSpeakDescriptionService
         CancellationToken cancellationToken = default)
     {
         if (_teamSpeakService.State != ConnectionState.Connected)
+        {
+            _transitionTiming?.MarkTsDescriptionSkipped();
             return;
+        }
 
+        var sw = Stopwatch.StartNew();
         try
         {
             await _teamSpeakService.SetDescriptionAsync(description, cancellationToken);
@@ -105,10 +119,13 @@ public sealed class TeamSpeakDescriptionService
                 _logger.LogInformation(
                     "TeamSpeak description updated for {SourceKey} ({Length} chars)",
                     sourceKey, description.Length);
+
+            _transitionTiming?.MarkTsDescriptionComplete(sw.Elapsed);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to update TeamSpeak description");
+            _transitionTiming?.MarkTsDescriptionComplete(sw.Elapsed);
         }
     }
 }
