@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using TS_DJ.Audio.Media;
 using TS_DJ.Core.Services;
 using TS_DJ.Audio.Mixing;
 using TS_DJ.Audio.Playback;
@@ -10,10 +11,12 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddTsDjAudio(this IServiceCollection services)
     {
-        services.AddSingleton<PlaybackStreamPrefetchCache>(sp =>
-            new PlaybackStreamPrefetchCache(
-                sp.GetRequiredService<IPlaybackStreamOpener>(),
-                sp.GetService<Microsoft.Extensions.Logging.ILogger<PlaybackStreamPrefetchCache>>()));
+        services.AddSingleton<MediaLoadTimingTracker>();
+        services.AddSingleton<IMediaPlaybackLoader, MediaPlaybackLoader>();
+        services.AddSingleton<MediaLoadPrefetchCache>(sp =>
+            new MediaLoadPrefetchCache(
+                sp.GetRequiredService<IMediaPlaybackLoader>(),
+                sp.GetService<Microsoft.Extensions.Logging.ILogger<MediaLoadPrefetchCache>>()));
         services.AddSingleton<AudioMixerService>(sp =>
         {
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AudioMixerService>>();
@@ -28,10 +31,10 @@ public static class ServiceCollectionExtensions
                 outputLogger,
                 teamSpeak,
                 new Id(2),
+                sp.GetRequiredService<IMediaPlaybackLoader>(),
                 sp.GetService<IMediaSourceRegistry>(),
-                sp.GetService<IPlaybackStreamResolver>(),
-                sp.GetService<IPlaybackStreamOpener>(),
-                sp.GetService<PlaybackStreamPrefetchCache>());
+                sp.GetService<MediaLoadPrefetchCache>(),
+                sp.GetService<MediaLoadTimingTracker>());
         });
         services.AddSingleton<IAudioMixerService>(sp => sp.GetRequiredService<AudioMixerService>());
         services.AddSingleton<IAudioPlaybackService, AudioPlaybackService>();

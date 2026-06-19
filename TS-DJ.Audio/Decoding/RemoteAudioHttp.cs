@@ -29,15 +29,22 @@ internal static class RemoteAudioHttp
     /// NAudio's MP3 reader requires seek support for ID3 tag parsing.
     /// Only the active track is buffered; nothing is persisted to disk.
     /// </summary>
-    public static MemoryStream DownloadAsSeekableStream(string uri)
+    public static MemoryStream DownloadAsSeekableStream(string uri) =>
+        DownloadAsSeekableStreamAsync(uri).GetAwaiter().GetResult();
+
+    public static async Task<MemoryStream> DownloadAsSeekableStreamAsync(
+        string uri,
+        CancellationToken cancellationToken = default)
     {
         Exception? lastError = null;
 
         for (var attempt = 1; attempt <= MaxDownloadAttempts; attempt++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
-                return DownloadOnce(uri);
+                return await DownloadOnceAsync(uri, cancellationToken);
             }
             catch (Exception ex) when (ex is HttpRequestException or HttpIOException or IOException or TaskCanceledException)
             {
@@ -45,18 +52,16 @@ internal static class RemoteAudioHttp
                 if (attempt >= MaxDownloadAttempts)
                     break;
 
-                Thread.Sleep(250 * attempt);
+                await Task.Delay(250 * attempt, cancellationToken);
             }
         }
 
         throw new IOException("Failed to download remote audio stream after retries.", lastError);
     }
 
-    private static MemoryStream DownloadOnce(string uri)
+    private static async Task<MemoryStream> DownloadOnceAsync(string uri, CancellationToken cancellationToken)
     {
-        using var response = SharedClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead)
-            .GetAwaiter()
-            .GetResult();
+        using var response = await SharedClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -65,11 +70,11 @@ internal static class RemoteAudioHttp
         }
 
         var memory = new MemoryStream();
-        using (var network = response.Content.ReadAsStream())
+        await using (var network = await response.Content.ReadAsStreamAsync(cancellationToken))
         {
             try
             {
-                network.CopyTo(memory);
+                await network.CopyToAsync(memory, cancellationToken);
             }
             catch (HttpIOException ex) when (IsUsableDespiteLengthMismatch(ex, memory))
             {

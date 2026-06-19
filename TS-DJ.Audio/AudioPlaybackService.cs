@@ -29,7 +29,8 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         _teamSpeak = teamSpeak;
         _nicknameService = nicknameService;
 
-        _mixer.Music.Volume = _volume;
+        _mixer.DeckA.Volume = _volume;
+        _mixer.DeckB.Volume = _volume;
         _mixer.NowPlayingChanged += OnNowPlayingChanged;
         _mixer.QueueChanged += OnQueueChanged;
         _teamSpeak.StateChanged += OnTeamSpeakStateChanged;
@@ -46,12 +47,44 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         set
         {
             _volume = Math.Clamp(value, 0f, 1f);
-            _mixer.Music.Volume = _volume;
+            _mixer.DeckA.Volume = _volume;
+            _mixer.DeckB.Volume = _volume;
             _logger.LogDebug("Music volume set to {Volume:P0}", _volume);
         }
     }
 
+    public PlaybackSettings PlaybackSettings => _mixer.PlaybackSettings;
+    public IDeckChannel DeckA => _mixer.DeckA;
+    public IDeckChannel DeckB => _mixer.DeckB;
+    public DeckId ActiveDeckId => _mixer.ActiveDeckId;
+
     public event EventHandler<PlaybackState>? StateChanged;
+
+    public void SetPlaybackSettings(PlaybackSettings settings) =>
+        _mixer.SetPlaybackSettings(settings);
+
+    public async Task LoadToDeckAsync(
+        DeckId deckId,
+        PlaybackQueueItem item,
+        CancellationToken cancellationToken = default)
+    {
+        await _mixer.LoadToDeckAsync(deckId, item, cancellationToken);
+    }
+
+    public async Task PlayDeckAsync(DeckId deckId, CancellationToken cancellationToken = default)
+    {
+        if (!_teamSpeak.Client.Connected)
+        {
+            _logger.LogWarning("Cannot play deck — not connected to TeamSpeak");
+            return;
+        }
+
+        await _mixer.PlayDeckAsync(deckId, cancellationToken);
+        SetState(PlaybackState.Playing);
+    }
+
+    public void StopDeck(DeckId deckId) => _mixer.StopDeck(deckId);
+    public void CueDeck(DeckId deckId) => _mixer.CueDeck(deckId);
 
     public async Task LoadAsync(PlaybackQueueItem item, CancellationToken cancellationToken = default)
     {
@@ -219,12 +252,15 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         TryContinueQueue("QueueChanged");
     }
 
+    private bool IsMixerOutputting() =>
+        _mixer.DeckA.IsPlaying || _mixer.DeckB.IsPlaying || _mixer.CrossfadeInProgress;
+
     private void SyncPlaybackState(string reason)
     {
         if (_state == PlaybackState.Paused)
             return;
 
-        var isActivelyPlaying = _mixer.Music.IsPlaying && _mixer.NowPlaying is not null;
+        var isActivelyPlaying = IsMixerOutputting();
         var hasQueued = _mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
         var hasWaitingTrack = hasQueued
             || _mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Playing);
@@ -232,7 +268,9 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
         if (isActivelyPlaying)
         {
             SetState(PlaybackState.Playing);
-            _logger.LogDebug("SyncPlaybackState ({Reason}): Playing {FilePath}", reason, _mixer.NowPlaying!.FilePath);
+            _logger.LogDebug(
+                "SyncPlaybackState ({Reason}): Playing (deckA={DeckA}, deckB={DeckB}, crossfade={Crossfade})",
+                reason, _mixer.DeckA.IsPlaying, _mixer.DeckB.IsPlaying, _mixer.CrossfadeInProgress);
             return;
         }
 
@@ -243,7 +281,7 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
                 reason);
             _mixer.Start();
 
-            if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
+            if (IsMixerOutputting())
             {
                 SetState(PlaybackState.Playing);
                 return;
@@ -274,7 +312,7 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
             return;
 
         var hasQueued = _mixer.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
-        var isActivelyPlaying = _mixer.Music.IsPlaying && _mixer.NowPlaying is not null;
+        var isActivelyPlaying = IsMixerOutputting();
 
         if (!hasQueued || isActivelyPlaying)
             return;
@@ -285,12 +323,10 @@ public sealed class AudioPlaybackService : IAudioPlaybackService, IDisposable
 
         _mixer.Start();
 
-        if (_mixer.Music.IsPlaying && _mixer.NowPlaying is not null)
+        if (IsMixerOutputting())
         {
             SetState(PlaybackState.Playing);
-            _logger.LogInformation(
-                "TryContinueQueue ({Reason}): advanced to {FilePath}",
-                reason, _mixer.NowPlaying.FilePath);
+            _logger.LogInformation("TryContinueQueue ({Reason}): playback resumed", reason);
         }
         else
         {

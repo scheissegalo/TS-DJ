@@ -37,6 +37,7 @@ public partial class App : Application
                 services.AddTsDjInfrastructure();
                 services.AddTsDjTeamSpeak();
                 services.AddTsDjAudio();
+                services.AddSingleton<IPlaybackTargetService, PlaybackTargetService>();
                 services.AddSingleton<NavidromeMediaQueueService>();
                 services.AddSingleton<INavidromeMediaQueueService>(sp => sp.GetRequiredService<NavidromeMediaQueueService>());
                 services.AddSingleton<YoutubeMediaQueueService>();

@@ -2,6 +2,8 @@ Stream system Audio Input to teamspeak
 2Deck DJ and Playlist mode switch
 add Discord support - stream to discord server/channels
 add Mumble support - stream to mumble channels
+Support press enter to search in navidrome
+
 <!-- Add youtube support - Download and play -->
 <!-- Highlight Playing soundboard item -->
 <!-- Options as seperate window, add teamspeak connections here, options to add multiple servers here stored as favorites. On main window we instead have a dropdown with favorites. -->
@@ -11,6 +13,14 @@ Add recording of Teamspeak audio (listen to teamspeak audio and record)
 Show waveform and signal of recieved teamspeak audio.
 Instant record and add to soundboard.
 Live DJ possibilities, auto quantize, voice chopping, looping, recognize silence etc.
+add playback options like repeat playlist or repeat song, random play.
+
+seek with song position bar
+track position status on each deck in dual deck mode
+visual disc's on the dec's we can sratch
+
+resolution of track total time in the playlist
 
 Issues:
 Log still does not auto scroll to last entry
+

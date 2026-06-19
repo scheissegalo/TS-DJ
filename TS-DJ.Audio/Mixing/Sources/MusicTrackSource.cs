@@ -9,7 +9,7 @@ using TS_DJ.Core.Services;
 namespace TS_DJ.Audio.Mixing.Sources;
 
 /// <summary>
-/// Long-form music playback channel (future Deck A/B base).
+/// Long-form music playback channel (deck A/B base).
 /// </summary>
 public sealed class MusicTrackSource : IMusicTrackSource
 {
@@ -22,7 +22,8 @@ public sealed class MusicTrackSource : IMusicTrackSource
     private readonly WaveFormat _format;
     private AudioFileDecoder? _decoder;
     private string? _currentSourceKey;
-    private float _volume = 1f;
+    private float _userVolume = 1f;
+    private float _crossfadeGain = 1f;
     private bool _trackActive;
 
     public MusicTrackSource(
@@ -51,6 +52,7 @@ public sealed class MusicTrackSource : IMusicTrackSource
     public bool IsPlaying => _trackActive;
     internal bool IsOutputting => _gated.IsPlaying;
     internal bool HasActiveTrack => _decoder is not null && _trackActive;
+    internal MixerChannel MixerChannel => _channel;
     public string? CurrentFilePath => _currentSourceKey;
 
     public TimeSpan CurrentTime
@@ -73,78 +75,112 @@ public sealed class MusicTrackSource : IMusicTrackSource
 
     public float Volume
     {
-        get => _volume;
+        get => _userVolume;
         set
         {
-            _volume = Math.Clamp(value, 0f, 1f);
-            _channel.Volume = _volume;
+            _userVolume = Math.Clamp(value, 0f, 1f);
+            ApplyOutputVolumeLocked();
         }
     }
 
     public event EventHandler? TrackEnded;
 
-    public void Open(string filePath)
-    {
-        OpenPlaybackItem(PlaybackQueueItem.FromLocalFile(filePath));
-    }
+    public void Open(string filePath) =>
+        Open(PlaybackQueueItem.FromLocalFile(filePath), MediaLoadResult.FromLocalFile(filePath));
 
-    public void OpenPlaybackItem(PlaybackQueueItem item, string? resolvedStreamUrl = null)
+    public void Open(PlaybackQueueItem item, MediaLoadResult loadResult)
     {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(loadResult);
+
         lock (_sync)
         {
             StopInternal(logStop: false);
+            _crossfadeGain = 1f;
 
             _decoder = new AudioFileDecoder();
 
-            if (item.SourceKind == PlaybackSourceKind.LocalFile)
+            switch (loadResult.Kind)
             {
-                _decoder.Open(item.FilePath);
-                _currentSourceKey = item.SourceKey;
-            }
-            else if (item.SourceKind == PlaybackSourceKind.YouTube)
-            {
-                throw new InvalidOperationException("YouTube items require a buffered stream handle.");
-            }
-            else
-            {
-                var streamUrl = resolvedStreamUrl
-                    ?? throw new InvalidOperationException("Remote stream URL is required.");
-                var duration = item.DurationSeconds is > 0
-                    ? TimeSpan.FromSeconds(item.DurationSeconds.Value)
-                    : (TimeSpan?)null;
-                _decoder.OpenUri(streamUrl, duration);
-                _currentSourceKey = item.SourceKey;
+                case MediaLoadKind.LocalFile:
+                    var path = loadResult.LocalFilePath ?? item.FilePath;
+                    _decoder.Open(path);
+                    _currentSourceKey = item.SourceKey;
+                    break;
+
+                case MediaLoadKind.RemoteStreamUrl:
+                    var streamUrl = loadResult.StreamUrl
+                        ?? throw new InvalidOperationException("Remote stream URL is required.");
+                    var duration = item.DurationSeconds is > 0
+                        ? TimeSpan.FromSeconds(item.DurationSeconds.Value)
+                        : (TimeSpan?)null;
+                    _decoder.OpenUri(streamUrl, duration);
+                    _currentSourceKey = item.SourceKey;
+                    break;
+
+                case MediaLoadKind.BufferedStream:
+                    var handle = loadResult.StreamHandle
+                        ?? throw new InvalidOperationException("Buffered stream handle is required.");
+                    var streamDuration = item.DurationSeconds is > 0
+                        ? TimeSpan.FromSeconds(item.DurationSeconds.Value)
+                        : (TimeSpan?)null;
+                    _decoder.OpenStream(handle.OpenRead(), streamDuration);
+                    _currentSourceKey = item.SourceKey;
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(loadResult), loadResult.Kind, "Unsupported media load kind.");
             }
 
             _switchable.SetSource(_decoder.Output);
             RebindMixerInputLocked();
+            ApplyOutputVolumeLocked();
             _logger.LogInformation(
                 "Music track opened: {SourceKey} (duration {Duration:F1}s)",
                 _currentSourceKey, _decoder.TotalTime.TotalSeconds);
         }
     }
 
+    public void OpenPlaybackItem(PlaybackQueueItem item, string? resolvedStreamUrl = null)
+    {
+        if (item.SourceKind == PlaybackSourceKind.LocalFile)
+            Open(item, MediaLoadResult.FromLocalFile(item.FilePath));
+        else if (string.IsNullOrWhiteSpace(resolvedStreamUrl))
+            throw new InvalidOperationException("Remote stream URL is required.");
+        else
+            Open(item, MediaLoadResult.FromRemoteUrl(resolvedStreamUrl));
+    }
+
     public void OpenPlaybackItem(PlaybackQueueItem item, IPlaybackStreamHandle streamHandle)
     {
         ArgumentNullException.ThrowIfNull(streamHandle);
+        Open(item, MediaLoadResult.FromBufferedStream(streamHandle));
+    }
 
+    public float CrossfadeGain
+    {
+        get
+        {
+            lock (_sync)
+                return _crossfadeGain;
+        }
+    }
+
+    internal void ResetCrossfadeGain()
+    {
         lock (_sync)
         {
-            StopInternal(logStop: false);
+            _crossfadeGain = 1f;
+            ApplyOutputVolumeLocked();
+        }
+    }
 
-            _decoder = new AudioFileDecoder();
-            var duration = item.DurationSeconds is > 0
-                ? TimeSpan.FromSeconds(item.DurationSeconds.Value)
-                : (TimeSpan?)null;
-
-            _decoder.OpenStream(streamHandle.OpenRead(), duration);
-            _currentSourceKey = item.SourceKey;
-
-            _switchable.SetSource(_decoder.Output);
-            RebindMixerInputLocked();
-            _logger.LogInformation(
-                "Music track opened from stream: {SourceKey} (duration {Duration:F1}s)",
-                _currentSourceKey, _decoder.TotalTime.TotalSeconds);
+    internal void SetCrossfadeGain(float gain)
+    {
+        lock (_sync)
+        {
+            _crossfadeGain = Math.Clamp(gain, 0f, 1f);
+            ApplyOutputVolumeLocked();
         }
     }
 
@@ -161,6 +197,8 @@ public sealed class MusicTrackSource : IMusicTrackSource
             _logger.LogInformation("Music track started: {SourceKey}", _currentSourceKey);
         }
     }
+
+    public void Pause() => PauseOutput();
 
     internal void PauseOutput()
     {
@@ -191,15 +229,15 @@ public sealed class MusicTrackSource : IMusicTrackSource
     public void Stop()
     {
         lock (_sync)
-        {
             StopInternal(logStop: true);
-        }
     }
 
-    /// <summary>
-    /// Returns true when EOF was reached on the last mixed read tick.
-    /// Must be called from the mixer read path while holding the mixer lock.
-    /// </summary>
+    public void Cue()
+    {
+        lock (_sync)
+            StopInternal(logStop: true);
+    }
+
     internal bool TryConsumeTrackEnd(out string? finishedPath)
     {
         lock (_sync)
@@ -216,10 +254,6 @@ public sealed class MusicTrackSource : IMusicTrackSource
         }
     }
 
-    /// <summary>
-    /// Returns true when a decode failure was signaled on the last mixed read tick.
-    /// Must be called from the mixer read path while holding the mixer lock.
-    /// </summary>
     internal bool TryConsumeTrackDecodeFailure(out string? failedSourceKey, out Exception? error)
     {
         lock (_sync)
@@ -241,10 +275,6 @@ public sealed class MusicTrackSource : IMusicTrackSource
         }
     }
 
-    /// <summary>
-    /// Layer-2 fallback when a read exception escapes the decode boundary.
-    /// Must be called while holding the mixer lock.
-    /// </summary>
     internal void AbortTrackDueToDecodeError(Exception ex)
     {
         lock (_sync)
@@ -306,10 +336,9 @@ public sealed class MusicTrackSource : IMusicTrackSource
         _currentSourceKey = null;
     }
 
-    /// <summary>
-    /// NAudio's MixingSampleProvider drops inputs that return 0 samples (EOF/idle).
-    /// Re-attach before each track so queue advances remain audible.
-    /// </summary>
+    private void ApplyOutputVolumeLocked() =>
+        _channel.Volume = _userVolume * _crossfadeGain;
+
     private void RebindMixerInputLocked()
     {
         _channel.Detach();

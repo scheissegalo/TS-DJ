@@ -8,6 +8,7 @@ using TS_DJ.Audio.DependencyInjection;
 using TS_DJ.Audio.Mixing;
 using TS_DJ.Core.Audio;
 using TS_DJ.Core.Models;
+using TS_DJ.Core.Services;
 using TS_DJ.Infrastructure.DependencyInjection;
 using TS_DJ.TeamSpeak.DependencyInjection;
 using TSLib.Audio;
@@ -231,7 +232,7 @@ static AudioMixerService CreateFreshMixer(IServiceProvider provider) =>
         provider.GetRequiredService<ILogger<MixerOutputProducer>>(),
         provider.GetRequiredService<TS_DJ.TeamSpeak.TeamSpeakService>(),
         new TSLib.Helper.Id(99),
-        null);
+        provider.GetRequiredService<IMediaPlaybackLoader>());
 
 static void DumpQueue(AudioMixerService mixer)
 {

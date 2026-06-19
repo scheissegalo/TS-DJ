@@ -86,15 +86,69 @@
                         <TextBlock Grid.Column="1" Text="{Binding PlaybackStatus}" VerticalAlignment="Center" Opacity="0.8"/>
                     </Grid>
 
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" Text="Mode" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding PlaybackModeOptions}"
+                                  SelectedItem="{Binding PlaybackMode}"/>
+                        <CheckBox Grid.Column="2"
+                                  Content="Crossfade"
+                                  IsChecked="{Binding CrossfadeEnabled}"
+                                  IsVisible="{Binding IsSequentialMode}"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" IsVisible="{Binding IsSequentialMode}">
+                        <TextBlock Grid.Column="0" Text="Crossfade (s)" VerticalAlignment="Center"/>
+                        <Slider Grid.Column="1" Minimum="1" Maximum="12" Value="{Binding CrossfadeDurationSeconds}" TickFrequency="1"/>
+                        <TextBlock Grid.Column="2" Text="{Binding CrossfadeDurationSeconds, StringFormat={}{0:0.#}}" MinWidth="28"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsVisible="{Binding IsDualDeckMode}">
+                        <Border Grid.Column="0" Padding="8" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding DeckA.Title}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding DeckA.TrackDisplay}" TextTrimming="CharacterEllipsis"/>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Content="Play" Command="{Binding PlayDeckACommand}"/>
+                                    <Button Content="Cue" Command="{Binding CueDeckACommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Padding="8" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding DeckB.Title}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding DeckB.TrackDisplay}" TextTrimming="CharacterEllipsis"/>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Content="Play" Command="{Binding PlayDeckBCommand}"/>
+                                    <Button Content="Cue" Command="{Binding CueDeckBCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsDualDeckMode}">
+                        <Button Content="Pause" Command="{Binding PauseCommand}" IsEnabled="{Binding CanPause}"/>
+                        <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"/>
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding IsSequentialMode}">
                         <TextBlock Grid.Column="0" Text="Now playing" VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Text="{Binding NowPlayingDisplay}" VerticalAlignment="Center" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                     </Grid>
 
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" IsVisible="{Binding IsSequentialMode}">
                         <TextBlock Grid.Column="0" Text="{Binding ElapsedDisplay}" VerticalAlignment="Center" MinWidth="40" FontFamily="Consolas, Courier New, monospace"/>
                         <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding ProgressValue}" Height="8" VerticalAlignment="Center" IsHitTestVisible="False"/>
                         <TextBlock Grid.Column="2" Text="{Binding RemainingDisplay}" VerticalAlignment="Center" MinWidth="48" FontFamily="Consolas, Courier New, monospace"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" IsVisible="{Binding IsDualDeckMode}">
+                        <TextBlock Grid.Column="0" Text="Load to" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding LoadDeckOptions}"
+                                  SelectedItem="{Binding SelectedLoadDeck}"
+                                  HorizontalAlignment="Left"
+                                  MinWidth="100"/>
                     </Grid>
 
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
@@ -106,7 +160,7 @@
                         <TextBlock Grid.Column="1" Text="{Binding SelectedFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Opacity="0.85"/>
                     </Grid>
 
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsSequentialMode}">
                         <Button Content="Play" Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"/>
                         <Button Content="Pause" Command="{Binding PauseCommand}" IsEnabled="{Binding CanPause}"/>
                         <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"/>
@@ -134,6 +188,8 @@
                                 <Button Content="Manage…" Command="{Binding OpenPlaylistManagerCommand}"/>
                                 <Button Content="Clear" Command="{Binding ClearQueueCommand}" IsEnabled="{Binding CanClearQueue}"/>
                                 <Button Content="Remove" Command="{Binding RemoveSelectedQueueItemCommand}" IsEnabled="{Binding CanRemoveQueueItem}"/>
+                                <Button Content="→ A" Command="{Binding LoadSelectedToDeckACommand}" IsVisible="{Binding IsDualDeckMode}"/>
+                                <Button Content="→ B" Command="{Binding LoadSelectedToDeckBCommand}" IsVisible="{Binding IsDualDeckMode}"/>
                             </StackPanel>
                             <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding SavedPlaylists.Count}">
                                 <ComboBox Grid.Column="0"

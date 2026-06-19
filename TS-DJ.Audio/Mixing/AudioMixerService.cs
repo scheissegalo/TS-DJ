@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using TS_DJ.Audio.Media;
 using TS_DJ.Audio.Mixing.Sources;
 using TS_DJ.Audio.Playback;
 using TS_DJ.Core.Audio;
@@ -17,21 +18,23 @@ public sealed class AudioMixerService : IAudioMixerService
     private readonly AudioPipeline _pipeline;
     private readonly TeamSpeakService _teamSpeak;
     private readonly IMediaSourceRegistry? _mediaRegistry;
-    private readonly IPlaybackStreamResolver? _streamResolver;
-    private readonly IPlaybackStreamOpener? _streamOpener;
-    private readonly PlaybackStreamPrefetchCache? _prefetchCache;
+    private readonly IMediaPlaybackLoader _mediaLoader;
+    private readonly MediaLoadPrefetchCache? _prefetchCache;
+    private readonly MediaLoadTimingTracker? _timingTracker;
     private readonly object _sync = new();
     private readonly MixingSampleProvider _mixer;
     private readonly MixerOutputProducer _outputProducer;
+    private readonly CrossfadeController _crossfade;
     private readonly List<PlaybackQueueItem> _queue = [];
     private readonly Stack<PlaybackQueueItem> _playHistory = [];
     private float _masterVolume = AudioValues.HumanVolumeToFactor(50f);
     private int _encoderBitrateKbps = OpusBitratePresets.Default;
     private PlaybackQueueItem? _nowPlaying;
     private bool _isPaused;
+    private DeckId _activeDeckId = DeckId.A;
+    private PlaybackSettings _playbackSettings = new();
+    private int _pendingAdvanceCount;
     private const int StalledReadThreshold = 50;
-
-    public PreloadedClipCache ClipCache { get; } = new();
 
     public AudioMixerService(
         ILogger<AudioMixerService> logger,
@@ -40,25 +43,28 @@ public sealed class AudioMixerService : IAudioMixerService
         ILogger<MixerOutputProducer> outputLogger,
         TeamSpeakService teamSpeak,
         Id pipelineId,
+        IMediaPlaybackLoader mediaLoader,
         IMediaSourceRegistry? mediaRegistry = null,
-        IPlaybackStreamResolver? streamResolver = null,
-        IPlaybackStreamOpener? streamOpener = null,
-        PlaybackStreamPrefetchCache? prefetchCache = null)
+        MediaLoadPrefetchCache? prefetchCache = null,
+        MediaLoadTimingTracker? timingTracker = null)
     {
         _mediaRegistry = mediaRegistry;
-        _streamResolver = streamResolver;
-        _streamOpener = streamOpener;
+        _mediaLoader = mediaLoader;
         _prefetchCache = prefetchCache;
+        _timingTracker = timingTracker;
         _logger = logger;
         _teamSpeak = teamSpeak;
-
-        var format = WaveFormat.CreateIeeeFloatWaveFormat(AudioFormat.SampleRate, AudioFormat.Channels);
-        _mixer = new MixingSampleProvider(format)
+        _crossfade = new CrossfadeController(_sync)
         {
-            ReadFully = false
+            Enabled = _playbackSettings.CrossfadeEnabled,
+            Duration = TimeSpan.FromSeconds(_playbackSettings.CrossfadeDurationSeconds)
         };
 
-        Music = new MusicTrackSource("music", "Music", _mixer, _sync, musicLogger);
+        var format = WaveFormat.CreateIeeeFloatWaveFormat(AudioFormat.SampleRate, AudioFormat.Channels);
+        _mixer = new MixingSampleProvider(format) { ReadFully = false };
+
+        DeckA = new DeckChannel(DeckId.A, _mixer, _sync, musicLogger);
+        DeckB = new DeckChannel(DeckId.B, _mixer, _sync, musicLogger);
         Soundboard = new SoundEffectSource("soundboard", "Soundboard", _mixer, _sync, soundboardLogger, ClipCache);
         Microphone = new MicrophoneSource("microphone", "Microphone");
 
@@ -72,7 +78,7 @@ public sealed class AudioMixerService : IAudioMixerService
                 if (Soundboard is SoundEffectSource soundboard)
                     soundboard.TickCleanup(mixerReadBytes);
             },
-            Music.NotifyMixedRead,
+            NotifyDecksMixedRead,
             OnMixerReadException,
             outputLogger);
 
@@ -83,17 +89,72 @@ public sealed class AudioMixerService : IAudioMixerService
         _pipeline.SetEncoderBitrate(_encoderBitrateKbps);
 
         _logger.LogInformation(
-            "AudioMixerService initialized — mixer inputs: music=attached, soundboard=attached, mic=detached, ReadFully=false");
+            "AudioMixerService initialized — decks=A+B, soundboard=attached, mic=detached");
     }
 
-    public MusicTrackSource Music { get; }
-    IMusicTrackSource IAudioMixerService.Music => Music;
+    public DeckChannel DeckA { get; }
+    IDeckChannel IAudioMixerService.DeckA => DeckA;
+
+    public DeckChannel DeckB { get; }
+    IDeckChannel IAudioMixerService.DeckB => DeckB;
+
+    public DeckId ActiveDeckId
+    {
+        get
+        {
+            lock (_sync)
+                return _activeDeckId;
+        }
+    }
+
+    public DeckChannel ActiveDeck
+    {
+        get
+        {
+            lock (_sync)
+                return GetDeckLocked(_activeDeckId);
+        }
+    }
+
+    IDeckChannel IAudioMixerService.ActiveDeck => ActiveDeck;
+
+    public MusicTrackSource Music => ActiveDeck.Source;
+    IMusicTrackSource IAudioMixerService.Music => ActiveDeck;
 
     public SoundEffectSource Soundboard { get; }
     ISoundEffectSource IAudioMixerService.Soundboard => Soundboard;
 
     public MicrophoneSource Microphone { get; }
     IMicrophoneSource IAudioMixerService.Microphone => Microphone;
+
+    public PlaybackSettings PlaybackSettings
+    {
+        get
+        {
+            lock (_sync)
+                return _playbackSettings;
+        }
+    }
+
+    public bool CrossfadeInProgress
+    {
+        get
+        {
+            lock (_sync)
+                return _crossfade.IsActive;
+        }
+    }
+
+    public bool AdvancePending
+    {
+        get
+        {
+            lock (_sync)
+                return _pendingAdvanceCount > 0;
+        }
+    }
+
+    public PreloadedClipCache ClipCache { get; } = new();
 
     public IReadOnlyList<PlaybackQueueItem> Queue
     {
@@ -134,8 +195,6 @@ public sealed class AudioMixerService : IAudioMixerService
 
             _encoderBitrateKbps = normalized;
             _pipeline.SetEncoderBitrate(_encoderBitrateKbps);
-            _logger.LogInformation("Opus encoder bitrate changed to {BitrateKbps} kbps ({BitrateBps} bps)",
-                _encoderBitrateKbps, _encoderBitrateKbps * 1000);
             EncoderBitrateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -146,39 +205,31 @@ public sealed class AudioMixerService : IAudioMixerService
         set => Soundboard.Volume = Math.Clamp(value, 0f, 1f);
     }
 
-    public void PlaySoundEffect(string filePath, float gainFactor = 1f)
-    {
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException("Audio file not found.", filePath);
+    public event EventHandler? QueueChanged;
+    public event EventHandler? NowPlayingChanged;
+    public event EventHandler? AdvancePendingChanged;
+    public event EventHandler<DeckStateChangedEventArgs>? DeckStateChanged;
+    public event EventHandler<PlaybackModeChangedEventArgs>? PlaybackModeChanged;
+    public event EventHandler? EncoderBitrateChanged;
 
-        if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
-        {
-            throw new NotSupportedException(
-                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF, FLAC.");
-        }
+    public void SetPlaybackSettings(PlaybackSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
 
         lock (_sync)
         {
-            Soundboard.Play(filePath, gainFactor);
-
-            var active = HasActiveAudioLocked();
-            var transmitting = _pipeline.IsTransmitting;
-            var sfxCount = Soundboard.ActiveEffectCount;
-
-            _logger.LogInformation(
-                "PlaySoundEffect state: active={Active}, transmitting={Transmitting}, sfxLive={SfxCount}, channelAttached={Attached}, musicOutputting={MusicOutputting}",
-                active, transmitting, sfxCount, Soundboard.IsChannelAttached, Music.IsOutputting);
-
-            if (active && !transmitting)
-                BeginTransmissionLocked(forSoundboardOnly: _isPaused || !Music.IsOutputting);
+            _playbackSettings = new PlaybackSettings
+            {
+                Mode = settings.Mode,
+                CrossfadeEnabled = settings.CrossfadeEnabled,
+                CrossfadeDurationSeconds = settings.CrossfadeDurationSeconds
+            };
+            _crossfade.Enabled = settings.CrossfadeEnabled;
+            _crossfade.Duration = TimeSpan.FromSeconds(settings.CrossfadeDurationSeconds);
         }
 
-        _logger.LogInformation("Sound effect triggered: {FilePath}", filePath);
+        PlaybackModeChanged?.Invoke(this, new PlaybackModeChangedEventArgs(settings.Mode));
     }
-
-    public event EventHandler? QueueChanged;
-    public event EventHandler? NowPlayingChanged;
-    public event EventHandler? EncoderBitrateChanged;
 
     public void Enqueue(string filePath) =>
         Enqueue(PlaybackQueueItem.FromLocalFile(filePath));
@@ -190,26 +241,38 @@ public sealed class AudioMixerService : IAudioMixerService
 
         lock (_sync)
         {
-            _queue.Add(new PlaybackQueueItem
-            {
-                SourceKind = item.SourceKind,
-                FilePath = item.FilePath,
-                RemoteTrackId = item.RemoteTrackId,
-                VideoUrl = item.VideoUrl,
-                ThumbnailUrl = item.ThumbnailUrl,
-                DisplayName = item.DisplayName,
-                Artist = item.Artist,
-                Album = item.Album,
-                DurationSeconds = item.DurationSeconds,
-                Status = PlaybackQueueStatus.Queued
-            });
-
-            _logger.LogInformation(
-                "Queue enqueue: {SourceKey} (queue size={QueueSize}, queued={QueuedCount})",
-                item.SourceKey, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
+            var clone = CloneQueueItem(item);
+            clone.Status = PlaybackQueueStatus.Queued;
+            _queue.Add(clone);
         }
 
-        _prefetchCache?.StartPrefetch(item);
+        if (MediaLoadPrefetchCache.ShouldPrefetch(item))
+            _prefetchCache?.StartPrefetch(item);
+        RaiseQueueChanged();
+    }
+
+    public void EnqueueRange(IEnumerable<PlaybackQueueItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        PlaybackQueueItem? firstNonLocal = null;
+
+        lock (_sync)
+        {
+            foreach (var item in items)
+            {
+                ValidateQueueItem(item);
+                var clone = CloneQueueItem(item);
+                clone.Status = PlaybackQueueStatus.Queued;
+                _queue.Add(clone);
+
+                if (firstNonLocal is null && MediaLoadPrefetchCache.ShouldPrefetch(clone))
+                    firstNonLocal = clone;
+            }
+        }
+
+        if (firstNonLocal is not null)
+            _prefetchCache?.StartPrefetch(firstNonLocal);
+
         RaiseQueueChanged();
     }
 
@@ -241,41 +304,610 @@ public sealed class AudioMixerService : IAudioMixerService
         RaiseQueueChanged();
     }
 
-    public void EnqueueRange(IEnumerable<PlaybackQueueItem> items)
+    public void RemoveFromQueue(int index)
     {
-        ArgumentNullException.ThrowIfNull(items);
-
-        var enqueued = new List<PlaybackQueueItem>();
         lock (_sync)
         {
-            var added = 0;
-            foreach (var item in items)
-            {
-                ValidateQueueItem(item);
-                var clone = new PlaybackQueueItem
-                {
-                    SourceKind = item.SourceKind,
-                    FilePath = item.FilePath,
-                    RemoteTrackId = item.RemoteTrackId,
-                    VideoUrl = item.VideoUrl,
-                    ThumbnailUrl = item.ThumbnailUrl,
-                    DisplayName = item.DisplayName,
-                    Artist = item.Artist,
-                    Album = item.Album,
-                    DurationSeconds = item.DurationSeconds,
-                    Status = PlaybackQueueStatus.Queued
-                };
-                _queue.Add(clone);
-                enqueued.Add(clone);
-                added++;
-            }
+            if (index < 0 || index >= _queue.Count)
+                return;
 
-            _logger.LogInformation(
-                "Queue enqueue range: {Added} item(s) (queue size={QueueSize}, queued={QueuedCount})",
-                added, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
+            var item = _queue[index];
+            if (item.Status == PlaybackQueueStatus.Playing)
+                return;
+
+            _queue.RemoveAt(index);
         }
 
         RaiseQueueChanged();
+    }
+
+    public void ClearQueue()
+    {
+        lock (_sync)
+            _queue.RemoveAll(item => item.Status != PlaybackQueueStatus.Playing);
+
+        RaiseQueueChanged();
+    }
+
+    public bool CanSkipPrevious
+    {
+        get
+        {
+            lock (_sync)
+                return _playbackSettings.Mode == PlaybackMode.SequentialQueue
+                    && (_nowPlaying is not null || _playHistory.Count > 0);
+        }
+    }
+
+    public void PlayQueueItem(int index)
+    {
+        if (_playbackSettings.Mode != PlaybackMode.SequentialQueue)
+            return;
+
+        PlaybackQueueItem? target;
+        lock (_sync)
+        {
+            if (!TryGetQueueItemLocked(index, out target))
+                return;
+        }
+
+        ScheduleAsyncAdvanceToItem(target!);
+    }
+
+    public Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default)
+    {
+        if (_playbackSettings.Mode != PlaybackMode.SequentialQueue)
+            return Task.CompletedTask;
+
+        PlaybackQueueItem? target;
+        lock (_sync)
+        {
+            if (!TryGetQueueItemLocked(index, out target))
+                return Task.CompletedTask;
+        }
+
+        return AdvanceToQueueItemAsync(target!, cancellationToken);
+    }
+
+    public async Task LoadToDeckAsync(
+        DeckId deckId,
+        PlaybackQueueItem item,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ValidateQueueItem(item);
+
+        var loadResult = await LoadMediaForItemAsync(item, cancellationToken);
+
+        lock (_sync)
+        {
+            var deck = GetDeckLocked(deckId);
+            deck.Open(item, loadResult);
+            RaiseDeckStateChangedLocked(deck);
+        }
+    }
+
+    public async Task PlayDeckAsync(DeckId deckId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_sync)
+        {
+            var target = GetDeckLocked(deckId);
+            if (target.LoadedItem is null)
+                throw new InvalidOperationException($"Deck {deckId} has no loaded track.");
+
+            var other = GetInactiveDeckLocked(deckId);
+
+            if (_playbackSettings.Mode == PlaybackMode.DualDeck
+                && other.IsOutputting)
+            {
+                _activeDeckId = deckId;
+                _crossfade.StartCrossfade(other, target, () =>
+                {
+                    lock (_sync)
+                    {
+                        _activeDeckId = deckId;
+                        RaiseDeckStateChangedLocked(other);
+                        RaiseDeckStateChangedLocked(target);
+                    }
+                });
+
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked();
+                else if (!_crossfade.IsActive)
+                    _pipeline.ResyncForNewTrack();
+
+                RaiseDeckStateChangedLocked(target);
+                return;
+            }
+
+            if (other.IsOutputting)
+            {
+                other.Cue();
+                other.ResetCrossfadeGain();
+                RaiseDeckStateChangedLocked(other);
+            }
+
+            _activeDeckId = deckId;
+            target.ResetCrossfadeGain();
+            target.Play();
+
+            if (!_pipeline.IsTransmitting)
+                BeginTransmissionLocked();
+            else
+                _pipeline.ResyncForNewTrack();
+
+            RaiseDeckStateChangedLocked(target);
+        }
+
+        await Task.CompletedTask;
+    }
+
+    public void StopDeck(DeckId deckId)
+    {
+        lock (_sync)
+        {
+            var deck = GetDeckLocked(deckId);
+            deck.Stop();
+            RaiseDeckStateChangedLocked(deck);
+
+            if (!HasActiveAudioLocked())
+                StopTransmissionLocked("deck stopped");
+        }
+    }
+
+    public void CueDeck(DeckId deckId)
+    {
+        lock (_sync)
+        {
+            var deck = GetDeckLocked(deckId);
+            deck.Cue();
+            RaiseDeckStateChangedLocked(deck);
+
+            if (!HasActiveAudioLocked())
+                StopTransmissionLocked("deck cued");
+        }
+    }
+
+    public void SkipNext()
+    {
+        if (_playbackSettings.Mode != PlaybackMode.SequentialQueue)
+            return;
+
+        PlaybackQueueItem? next;
+        PlaybackQueueItem? currentItem;
+        lock (_sync)
+        {
+            PushCurrentToHistoryLocked();
+
+            currentItem = _nowPlaying;
+            if (currentItem is not null)
+                currentItem.Status = PlaybackQueueStatus.Played;
+
+            next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+            if (next is null)
+            {
+                if (!AnyDeckOutputtingLocked() && !_crossfade.IsActive)
+                {
+                    _nowPlaying = null;
+                    EnterIdleLocked("skip next — queue empty");
+                }
+                else if (currentItem is not null)
+                    _nowPlaying = currentItem;
+            }
+        }
+
+        if (next is not null)
+            ScheduleAsyncAdvanceToItem(next);
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+    }
+
+    public void SkipPrevious()
+    {
+        if (_playbackSettings.Mode != PlaybackMode.SequentialQueue)
+            return;
+
+        var changed = false;
+        lock (_sync)
+        {
+            if (_nowPlaying is null && _playHistory.Count == 0)
+                return;
+
+            var active = ActiveDeck;
+            if (_nowPlaying is not null && active.CurrentTime > TimeSpan.FromSeconds(3))
+            {
+                active.Play();
+                _pipeline.ResyncForNewTrack();
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked();
+                changed = true;
+            }
+            else if (_playHistory.Count > 0)
+            {
+                var previousItem = _playHistory.Pop();
+                var index = EnsureQueuedItemLocked(previousItem);
+                PushCurrentToHistoryLocked();
+                DemoteCurrentPlayingLocked();
+                var target = _queue[index];
+                ScheduleAsyncAdvanceToItem(target);
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            RaiseNowPlayingChanged();
+            RaiseQueueChanged();
+        }
+    }
+
+    public void Start()
+    {
+        PlaybackQueueItem? next = null;
+        lock (_sync)
+        {
+            if (_playbackSettings.Mode == PlaybackMode.DualDeck)
+            {
+                var deck = ActiveDeck;
+                if (_isPaused && deck.HasActiveTrack)
+                {
+                    deck.ResumeOutput();
+                    BeginTransmissionLocked();
+                    _isPaused = false;
+                    return;
+                }
+
+                if (deck.IsOutputting && !_pipeline.IsTransmitting)
+                    BeginTransmissionLocked();
+                return;
+            }
+
+            if (_isPaused && ActiveDeck.HasActiveTrack)
+            {
+                ActiveDeck.ResumeOutput();
+                BeginTransmissionLocked();
+                _isPaused = false;
+                return;
+            }
+
+            if (ActiveDeck.IsOutputting)
+            {
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked();
+                return;
+            }
+
+            next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+            if (next is null)
+                return;
+        }
+
+        ScheduleAsyncAdvanceToItem(next);
+    }
+
+    public void Pause()
+    {
+        lock (_sync)
+        {
+            if (!ActiveDeck.HasActiveTrack && !DeckA.HasActiveTrack && !DeckB.HasActiveTrack && !_isPaused)
+                return;
+
+            ActiveDeck.PauseOutput();
+            _isPaused = ActiveDeck.HasActiveTrack;
+
+            if (!HasActiveAudioLocked())
+                StopTransmissionLocked("paused");
+        }
+    }
+
+    public void Stop()
+    {
+        lock (_sync)
+        {
+            _crossfade.Cancel(DeckA, DeckB);
+
+            if (_nowPlaying is not null)
+            {
+                if (ActiveDeck.IsStalled(StalledReadThreshold) || !ActiveDeck.IsPlaying)
+                    _nowPlaying.Status = PlaybackQueueStatus.Played;
+                else
+                    _nowPlaying.Status = PlaybackQueueStatus.Queued;
+                _nowPlaying = null;
+            }
+
+            DeckA.Cue();
+            DeckB.Cue();
+            _isPaused = false;
+            _playHistory.Clear();
+
+            if (Soundboard.IsActive)
+            {
+                if (!_pipeline.IsTransmitting)
+                    BeginTransmissionLocked(forSoundboardOnly: true);
+            }
+            else
+                StopTransmissionLocked("stopped");
+        }
+
+        RaiseDeckStateChangedLocked(DeckA);
+        RaiseDeckStateChangedLocked(DeckB);
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+    }
+
+    public void PlaySoundEffect(string filePath, float gainFactor = 1f)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Audio file not found.", filePath);
+
+        if (!Decoding.AudioFileDecoder.IsSupportedFile(filePath))
+        {
+            throw new NotSupportedException(
+                $"Unsupported audio format '{Path.GetExtension(filePath)}'. Supported: MP3, WAV, AIFF, FLAC.");
+        }
+
+        lock (_sync)
+        {
+            Soundboard.Play(filePath, gainFactor);
+
+            if (HasActiveAudioLocked() && !_pipeline.IsTransmitting)
+                BeginTransmissionLocked(forSoundboardOnly: _isPaused || !AnyDeckOutputtingLocked());
+        }
+    }
+
+    private bool StartQueueItemOnActiveDeckLocked(PlaybackQueueItem target, MediaLoadResult loadResult)
+    {
+        ArgumentNullException.ThrowIfNull(loadResult);
+
+        if (target.Status == PlaybackQueueStatus.Playing)
+            return false;
+
+        PushCurrentToHistoryLocked();
+        DemoteCurrentPlayingLocked();
+
+        target.Status = PlaybackQueueStatus.Playing;
+        _nowPlaying = target;
+
+        try
+        {
+            var load = loadResult;
+            var outgoing = ActiveDeck;
+            var incoming = outgoing.IsOutputting ? GetInactiveDeckLocked() : outgoing;
+
+            if (outgoing.IsOutputting
+                && incoming.DeckId != outgoing.DeckId
+                && _crossfade.Enabled
+                && _playbackSettings.CrossfadeEnabled)
+            {
+                incoming.Open(target, load);
+                PrefetchNextQueuedLocked();
+                _crossfade.StartCrossfade(outgoing, incoming, () =>
+                {
+                    lock (_sync)
+                    {
+                        _activeDeckId = incoming.DeckId;
+                        RaiseDeckStateChangedLocked(outgoing);
+                        RaiseDeckStateChangedLocked(incoming);
+                    }
+                });
+                _activeDeckId = incoming.DeckId;
+            }
+            else
+            {
+                if (outgoing.IsOutputting && incoming.DeckId != outgoing.DeckId)
+                {
+                    outgoing.Cue();
+                    outgoing.ResetCrossfadeGain();
+                    RaiseDeckStateChangedLocked(outgoing);
+                }
+
+                incoming.Open(target, load);
+                incoming.ResetCrossfadeGain();
+                incoming.Play();
+                _activeDeckId = incoming.DeckId;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to play queue item: {SourceKey}", target.SourceKey);
+            target.Status = PlaybackQueueStatus.Failed;
+            _nowPlaying = null;
+            RaiseQueueChanged();
+            return false;
+        }
+
+        if (!_pipeline.IsTransmitting)
+            BeginTransmissionLocked();
+        else if (!_crossfade.IsActive)
+            _pipeline.ResyncForNewTrack();
+
+        RaiseDeckStateChangedLocked(ActiveDeck);
+        return true;
+    }
+
+    private void HandleTrackFinishedLocked(DeckChannel deck)
+    {
+        if (_playbackSettings.Mode == PlaybackMode.DualDeck)
+        {
+            deck.Cue();
+            RaiseDeckStateChangedLocked(deck);
+            deck.NotifyTrackEndedEvent();
+
+            if (!HasActiveAudioLocked())
+                EnterIdleLocked("deck finished");
+
+            return;
+        }
+
+        if (_crossfade.IsActive && deck.DeckId != ActiveDeckId)
+            return;
+
+        if (deck.DeckId != ActiveDeckId)
+            return;
+
+        var finished = _nowPlaying;
+        if (finished is not null)
+        {
+            finished.Status = PlaybackQueueStatus.Played;
+            if (_playHistory.Count == 0 || _playHistory.Peek().SourceKey != finished.SourceKey)
+                _playHistory.Push(CloneQueueItem(finished));
+        }
+
+        if (_queue.Any(i => i.Status == PlaybackQueueStatus.Queued))
+        {
+            var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+            if (next is not null)
+                ScheduleAsyncAdvanceToItem(next);
+            else if (!HasActiveAudioLocked())
+                EnterIdleLocked("queue advance failed");
+        }
+        else
+        {
+            if (!HasActiveAudioLocked())
+            {
+                _nowPlaying = null;
+                EnterIdleLocked("queue finished");
+            }
+        }
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+        deck.NotifyTrackEndedEvent();
+    }
+
+    private void HandleTrackDecodeFailedLocked(DeckChannel deck, Exception? error)
+    {
+        if (_playbackSettings.Mode == PlaybackMode.DualDeck)
+        {
+            deck.Cue();
+            RaiseDeckStateChangedLocked(deck);
+            if (!HasActiveAudioLocked())
+                EnterIdleLocked("deck decode failure");
+            return;
+        }
+
+        if (deck.DeckId != ActiveDeckId)
+            return;
+
+        if (_nowPlaying is not null)
+            _nowPlaying.Status = PlaybackQueueStatus.Failed;
+
+        if (_queue.Any(i => i.Status == PlaybackQueueStatus.Queued))
+        {
+            var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
+            if (next is not null)
+                ScheduleAsyncAdvanceToItem(next);
+            else if (!HasActiveAudioLocked())
+                EnterIdleLocked("decode failure — queue recovery exhausted");
+        }
+        else if (!HasActiveAudioLocked())
+            EnterIdleLocked("decode failure — queue empty");
+
+        RaiseNowPlayingChanged();
+        RaiseQueueChanged();
+    }
+
+    private void ProcessLifecycleLocked()
+    {
+        _crossfade.Tick();
+        MaybePrefetchLookaheadLocked();
+
+        foreach (var deck in new[] { DeckA, DeckB })
+        {
+            if (deck.TryConsumeTrackDecodeFailure(out var failedPath, out var decodeError))
+            {
+                _logger.LogWarning(decodeError, "Decode failure on {Deck}: {SourceKey}", deck.DeckId, failedPath);
+                HandleTrackDecodeFailedLocked(deck, decodeError);
+                return;
+            }
+
+            if (deck.TryConsumeTrackEnd(out var finishedPath))
+            {
+                _logger.LogInformation("EOF on {Deck}: {SourceKey}", deck.DeckId, finishedPath);
+                HandleTrackFinishedLocked(deck);
+                return;
+            }
+
+            if (deck.IsStalled(StalledReadThreshold))
+            {
+                _logger.LogWarning("Stalled reads on {Deck}: {SourceKey}", deck.DeckId, deck.CurrentFilePath);
+                deck.ForceTrackEnd();
+                return;
+            }
+        }
+
+        if (!HasActiveAudioLocked() && _pipeline.IsTransmitting)
+            EnterIdleLocked("no active sources during read");
+    }
+
+    private void MaybePrefetchLookaheadLocked()
+    {
+        if (_prefetchCache is null || _timingTracker is null)
+            return;
+
+        if (_playbackSettings.Mode != PlaybackMode.SequentialQueue)
+            return;
+
+        var next = _queue.FirstOrDefault(i => i.Status == PlaybackQueueStatus.Queued);
+        if (next is null || _prefetchCache.IsReady(next) || _prefetchCache.IsInProgress(next))
+            return;
+
+        var deck = ActiveDeck;
+        if (!deck.IsOutputting)
+            return;
+
+        var remaining = deck.TotalTime - deck.CurrentTime;
+        if (remaining <= TimeSpan.Zero)
+            return;
+
+        var estimatedLoad = TimeSpan.FromMilliseconds(_timingTracker.EstimatedLoadMs(next.SourceKind));
+        var crossfade = TimeSpan.FromSeconds(_playbackSettings.CrossfadeDurationSeconds);
+        if (remaining > crossfade + estimatedLoad)
+            return;
+
+        _prefetchCache.StartPrefetch(next);
+    }
+
+    private void NotifyDecksMixedRead(int sampleBytes)
+    {
+        DeckA.NotifyMixedRead(sampleBytes);
+        DeckB.NotifyMixedRead(sampleBytes);
+    }
+
+    private void OnMixerReadException(Exception ex)
+    {
+        if (DeckA.IsOutputting)
+            DeckA.AbortTrackDueToDecodeError(ex);
+        if (DeckB.IsOutputting)
+            DeckB.AbortTrackDueToDecodeError(ex);
+    }
+
+    private bool HasActiveAudioLocked() =>
+        AnyDeckOutputtingLocked() || Soundboard.IsActive || _crossfade.IsActive;
+
+    private bool AnyDeckOutputtingLocked() =>
+        DeckA.IsOutputting || DeckB.IsOutputting;
+
+    private DeckChannel GetDeckLocked(DeckId deckId) =>
+        deckId == DeckId.A ? DeckA : DeckB;
+
+    private DeckChannel GetInactiveDeckLocked() =>
+        _activeDeckId == DeckId.A ? DeckB : DeckA;
+
+    private DeckChannel GetInactiveDeckLocked(DeckId deckId) =>
+        deckId == DeckId.A ? DeckB : DeckA;
+
+    private bool TryGetQueueItemLocked(int index, out PlaybackQueueItem item)
+    {
+        item = null!;
+        if (index < 0 || index >= _queue.Count)
+            return false;
+
+        item = _queue[index];
+        return item.Status != PlaybackQueueStatus.Playing;
     }
 
     private void ValidateQueueItem(PlaybackQueueItem item)
@@ -310,389 +942,6 @@ public sealed class AudioMixerService : IAudioMixerService
 
         if (string.IsNullOrWhiteSpace(item.RemoteTrackId))
             throw new ArgumentException("Remote queue items require a track id.", nameof(item));
-
-        if (_streamResolver is null)
-            throw new InvalidOperationException("Remote playback is not configured.");
-    }
-
-    private void OpenQueueItemLocked(
-        PlaybackQueueItem item,
-        string? resolvedStreamUrl = null,
-        IPlaybackStreamHandle? openedStream = null)
-    {
-        if (item.SourceKind == PlaybackSourceKind.LocalFile)
-        {
-            Music.OpenPlaybackItem(item);
-            return;
-        }
-
-        if (item.SourceKind == PlaybackSourceKind.YouTube)
-        {
-            var handle = openedStream;
-            if (handle is null && (_prefetchCache is null || !_prefetchCache.TryTakeReady(item, out handle)))
-                throw new InvalidOperationException("YouTube stream is not ready.");
-
-            if (handle is null)
-                throw new InvalidOperationException("Could not open YouTube stream.");
-
-            Music.OpenPlaybackItem(item, handle);
-            return;
-        }
-
-        var streamUrl = resolvedStreamUrl
-            ?? _streamResolver?.ResolveStreamUrlAsync(item).GetAwaiter().GetResult();
-        if (string.IsNullOrWhiteSpace(streamUrl))
-            throw new InvalidOperationException("Could not resolve remote stream URL.");
-
-        Music.OpenPlaybackItem(item, streamUrl);
-    }
-
-    public void RemoveFromQueue(int index)
-    {
-        lock (_sync)
-        {
-            if (index < 0 || index >= _queue.Count)
-                return;
-
-            var item = _queue[index];
-            if (item.Status == PlaybackQueueStatus.Playing)
-                return;
-
-            _queue.RemoveAt(index);
-            _logger.LogInformation("Queue remove index {Index}: {SourceKey}", index, item.SourceKey);
-        }
-
-        RaiseQueueChanged();
-    }
-
-    public void ClearQueue()
-    {
-        lock (_sync)
-        {
-            var removed = _queue.RemoveAll(item => item.Status != PlaybackQueueStatus.Playing);
-            _logger.LogInformation("Queue cleared ({Removed} items removed)", removed);
-        }
-
-        RaiseQueueChanged();
-    }
-
-    public bool CanSkipPrevious
-    {
-        get
-        {
-            lock (_sync)
-                return _nowPlaying is not null || _playHistory.Count > 0;
-        }
-    }
-
-    public void PlayQueueItem(int index)
-    {
-        bool started;
-        lock (_sync)
-        {
-            if (index < 0 || index >= _queue.Count)
-                return;
-
-            var target = _queue[index];
-            if (target.Status == PlaybackQueueStatus.Playing)
-                return;
-
-            PushCurrentToHistoryLocked();
-            DemoteCurrentPlayingLocked();
-
-            target.Status = PlaybackQueueStatus.Playing;
-            _nowPlaying = target;
-
-            try
-            {
-                OpenQueueItemLocked(target);
-                Music.Play();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to play queue item at index {Index}: {SourceKey}", index, target.SourceKey);
-                target.Status = PlaybackQueueStatus.Failed;
-                _nowPlaying = null;
-                RaiseQueueChanged();
-                return;
-            }
-
-            if (!_pipeline.IsTransmitting)
-                BeginTransmissionLocked();
-            else
-                _pipeline.ResyncForNewTrack();
-
-            started = true;
-            _logger.LogInformation("PlayQueueItem index {Index}: {SourceKey}", index, target.SourceKey);
-        }
-
-        if (started)
-        {
-            PrefetchNextQueuedLocked();
-            RaiseNowPlayingChanged();
-            RaiseQueueChanged();
-        }
-    }
-
-    public async Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default)
-    {
-        PlaybackQueueItem target;
-        lock (_sync)
-        {
-            if (index < 0 || index >= _queue.Count)
-                return;
-
-            target = _queue[index];
-            if (target.Status == PlaybackQueueStatus.Playing)
-                return;
-        }
-
-        if (target.SourceKind == PlaybackSourceKind.YouTube)
-        {
-            await PlayYouTubeQueueItemAsync(index, target, cancellationToken);
-            return;
-        }
-
-        if (target.SourceKind == PlaybackSourceKind.RemoteStream)
-        {
-            var streamUrl = _streamResolver is null
-                ? null
-                : await _streamResolver.ResolveStreamUrlAsync(target, cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(streamUrl))
-            {
-                _logger.LogError("Failed to resolve stream URL for {SourceKey}", target.SourceKey);
-                MarkQueueItemFailedLocked(index);
-                return;
-            }
-
-            PlayQueueItemWithResolvedMedia(index, streamUrl, null);
-            return;
-        }
-
-        PlayQueueItem(index);
-    }
-
-    private async Task PlayYouTubeQueueItemAsync(
-        int index,
-        PlaybackQueueItem target,
-        CancellationToken cancellationToken)
-    {
-        IPlaybackStreamHandle? handle = null;
-        if (_prefetchCache?.TryTakeReady(target, out handle) != true || handle is null)
-        {
-            if (_streamOpener is null)
-            {
-                MarkQueueItemFailedLocked(index);
-                return;
-            }
-
-            try
-            {
-                handle = await _streamOpener.OpenPlaybackStreamAsync(target, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to open YouTube stream for {SourceKey}", target.SourceKey);
-                MarkQueueItemFailedLocked(index);
-                return;
-            }
-        }
-
-        if (handle is null)
-        {
-            MarkQueueItemFailedLocked(index);
-            return;
-        }
-
-        PlayQueueItemWithResolvedMedia(index, null, handle);
-    }
-
-    private void PlayQueueItemWithResolvedMedia(
-        int index,
-        string? resolvedStreamUrl,
-        IPlaybackStreamHandle? openedStream)
-    {
-        bool started;
-        lock (_sync)
-        {
-            if (index < 0 || index >= _queue.Count)
-            {
-                openedStream?.Dispose();
-                return;
-            }
-
-            var target = _queue[index];
-            if (target.Status == PlaybackQueueStatus.Playing)
-            {
-                openedStream?.Dispose();
-                return;
-            }
-
-            PushCurrentToHistoryLocked();
-            DemoteCurrentPlayingLocked();
-
-            target.Status = PlaybackQueueStatus.Playing;
-            _nowPlaying = target;
-
-            try
-            {
-                OpenQueueItemLocked(target, resolvedStreamUrl, openedStream);
-                Music.Play();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to play queue item at index {Index}: {SourceKey}", index, target.SourceKey);
-                target.Status = PlaybackQueueStatus.Failed;
-                _nowPlaying = null;
-                openedStream?.Dispose();
-                RaiseQueueChanged();
-                return;
-            }
-
-            if (!_pipeline.IsTransmitting)
-                BeginTransmissionLocked();
-            else
-                _pipeline.ResyncForNewTrack();
-
-            started = true;
-            _logger.LogInformation("PlayQueueItem index {Index}: {SourceKey}", index, target.SourceKey);
-        }
-
-        if (started)
-        {
-            PrefetchNextQueuedLocked();
-            RaiseNowPlayingChanged();
-            RaiseQueueChanged();
-        }
-    }
-
-    private void MarkQueueItemFailedLocked(int index)
-    {
-        lock (_sync)
-        {
-            if (index < 0 || index >= _queue.Count)
-                return;
-
-            _queue[index].Status = PlaybackQueueStatus.Failed;
-            RaiseQueueChanged();
-        }
-    }
-
-    private void PrefetchNextQueuedLocked()
-    {
-        if (_prefetchCache is null)
-            return;
-
-        lock (_sync)
-            _prefetchCache.PrefetchNextQueued(_queue);
-    }
-
-    public void SkipNext()
-    {
-        bool advanced;
-        lock (_sync)
-        {
-            PushCurrentToHistoryLocked();
-
-            if (_nowPlaying is not null)
-            {
-                _nowPlaying.Status = PlaybackQueueStatus.Played;
-                _nowPlaying = null;
-            }
-
-            if (!TryAdvanceQueueLocked())
-            {
-                if (Soundboard.IsActive)
-                {
-                    _nowPlaying = null;
-                    if (!_pipeline.IsTransmitting)
-                        BeginTransmissionLocked();
-                }
-                else
-                    EnterIdleLocked("skip next — queue empty");
-                advanced = false;
-            }
-            else
-            {
-                _pipeline.ResyncForNewTrack();
-                if (!_pipeline.IsTransmitting)
-                    BeginTransmissionLocked();
-                advanced = true;
-            }
-
-            _logger.LogInformation("SkipNext — advanced={Advanced}", advanced);
-        }
-
-        RaiseNowPlayingChanged();
-        RaiseQueueChanged();
-    }
-
-    public void SkipPrevious()
-    {
-        var changed = false;
-        lock (_sync)
-        {
-            if (_nowPlaying is null && _playHistory.Count == 0)
-            {
-                _logger.LogDebug("SkipPrevious — nothing to go back to");
-                return;
-            }
-
-            if (_nowPlaying is not null && Music.CurrentTime > TimeSpan.FromSeconds(3))
-            {
-                var current = _nowPlaying;
-                try
-                {
-                    OpenQueueItemLocked(current);
-                    Music.Play();
-                    _pipeline.ResyncForNewTrack();
-                    if (!_pipeline.IsTransmitting)
-                        BeginTransmissionLocked();
-                    changed = true;
-                    _logger.LogInformation("SkipPrevious — restarted current track: {SourceKey}", current.SourceKey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "SkipPrevious — failed to restart {SourceKey}", current.SourceKey);
-                }
-            }
-            else if (_playHistory.Count > 0)
-            {
-                var previousItem = _playHistory.Pop();
-                var index = EnsureQueuedItemLocked(previousItem);
-                PushCurrentToHistoryLocked();
-                DemoteCurrentPlayingLocked();
-
-                var target = _queue[index];
-                target.Status = PlaybackQueueStatus.Playing;
-                _nowPlaying = target;
-
-                try
-                {
-                    OpenQueueItemLocked(target);
-                    Music.Play();
-                    if (!_pipeline.IsTransmitting)
-                        BeginTransmissionLocked();
-                    else
-                        _pipeline.ResyncForNewTrack();
-                    changed = true;
-                    _logger.LogInformation("SkipPrevious — playing history item: {SourceKey}", previousItem.SourceKey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "SkipPrevious — failed to play history item: {SourceKey}", previousItem.SourceKey);
-                    target.Status = PlaybackQueueStatus.Failed;
-                    _nowPlaying = null;
-                }
-            }
-        }
-
-        if (changed)
-        {
-            RaiseNowPlayingChanged();
-            RaiseQueueChanged();
-        }
     }
 
     private void PushCurrentToHistoryLocked()
@@ -746,328 +995,130 @@ public sealed class AudioMixerService : IAudioMixerService
             Status = item.Status
         };
 
-    public void Start()
+    private void PrefetchNextQueuedLocked()
     {
+        if (_prefetchCache is null)
+            return;
+
+        bool crossfadeEnabled;
+        IReadOnlyList<PlaybackQueueItem> queueSnapshot;
         lock (_sync)
         {
-            if (_isPaused && Music.HasActiveTrack)
-            {
-                Music.ResumeOutput();
-                BeginTransmissionLocked();
-                _isPaused = false;
-                _logger.LogInformation("Resumed paused music track: {SourceKey}", Music.CurrentFilePath);
-                return;
-            }
-
-            if (Music.IsOutputting)
-            {
-                if (!_pipeline.IsTransmitting)
-                {
-                    _logger.LogInformation(
-                        "Resuming voice transmission (transmitting={Transmitting})",
-                        _pipeline.IsTransmitting);
-                    BeginTransmissionLocked();
-                }
-
-                return;
-            }
-
-            if (!TryAdvanceQueueLocked())
-            {
-                _logger.LogWarning("Start requested but no queued tracks available");
-                return;
-            }
-
-            BeginTransmissionLocked();
+            crossfadeEnabled = _playbackSettings.CrossfadeEnabled;
+            queueSnapshot = _queue.ToList();
         }
 
-        if (Music.IsOutputting)
-            _pipeline.ResyncForNewTrack();
-
-        RaiseNowPlayingChanged();
-        RaiseQueueChanged();
+        _prefetchCache.PrefetchNextQueued(queueSnapshot, crossfadeEnabled);
     }
 
-    public void Pause()
+    private void SetAdvancePending(bool pending)
     {
+        var changed = false;
         lock (_sync)
         {
-            if (!Music.HasActiveTrack && !_isPaused)
-                return;
-
-            if (Music.HasActiveTrack)
-                Music.PauseOutput();
-
-            _isPaused = Music.HasActiveTrack;
-
-            if (!HasActiveAudioLocked())
-                StopTransmissionLocked("paused");
+            if (pending)
+            {
+                _pendingAdvanceCount++;
+                changed = _pendingAdvanceCount == 1;
+            }
+            else if (_pendingAdvanceCount > 0)
+            {
+                _pendingAdvanceCount--;
+                changed = _pendingAdvanceCount == 0;
+            }
         }
+
+        if (changed)
+            AdvancePendingChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public void Stop()
+    private void ScheduleAsyncAdvanceToItem(PlaybackQueueItem target)
     {
-        lock (_sync)
+        SetAdvancePending(true);
+        _ = Task.Run(async () =>
         {
-            if (_nowPlaying is not null)
-            {
-                // A track stuck at EOF still reports IsPlaying; don't re-queue it ahead of later tracks.
-                if (Music.IsStalled(StalledReadThreshold) || !Music.IsPlaying)
-                    _nowPlaying.Status = PlaybackQueueStatus.Played;
-                else
-                    _nowPlaying.Status = PlaybackQueueStatus.Queued;
-
-                _nowPlaying = null;
-            }
-
-            Music.Stop();
-            _isPaused = false;
-            _playHistory.Clear();
-
-            if (Soundboard.IsActive)
-            {
-                if (!_pipeline.IsTransmitting)
-                    BeginTransmissionLocked(forSoundboardOnly: true);
-            }
-            else
-                StopTransmissionLocked("stopped");
-        }
-
-        RaiseNowPlayingChanged();
-        RaiseQueueChanged();
-    }
-
-    private void HandleTrackDecodeFailedLocked(Exception? error)
-    {
-        var failed = _nowPlaying;
-
-        if (failed is not null)
-        {
-            failed.Status = PlaybackQueueStatus.Failed;
-            _logger.LogWarning(
-                error,
-                "Track decode failed: {SourceKey} ({ExceptionType}) — marking Failed, attempting queue recovery",
-                failed.SourceKey,
-                error?.GetType().Name ?? "Unknown");
-        }
-
-        var queuedCount = _queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
-        _logger.LogInformation(
-            "Queue state after decode failure: queued={QueuedCount}, failed={FailedCount}, total={Total}",
-            queuedCount,
-            _queue.Count(i => i.Status == PlaybackQueueStatus.Failed),
-            _queue.Count);
-
-        if (queuedCount > 0)
-        {
-            _logger.LogInformation(
-                "Queue recovery after decode failure ({QueuedCount} queued item(s) remaining)",
-                queuedCount);
-
-            if (!TryAdvanceQueueLocked())
-            {
-                _logger.LogError(
-                    "Queue recovery exhausted after decode failure — queued={QueuedCount}, failed={FailedCount}",
-                    queuedCount,
-                    _queue.Count(i => i.Status == PlaybackQueueStatus.Failed));
-                _nowPlaying = null;
-                if (Soundboard.IsActive)
-                {
-                    if (!_pipeline.IsTransmitting)
-                        BeginTransmissionLocked(forSoundboardOnly: true);
-                }
-                else
-                    EnterIdleLocked("decode failure — queue recovery exhausted");
-            }
-            else
-            {
-                _pipeline.ResyncForNewTrack();
-                if (!_pipeline.IsTransmitting)
-                    BeginTransmissionLocked();
-                _logger.LogInformation(
-                    "Queue recovered after decode failure — now playing: {SourceKey}",
-                    _nowPlaying?.SourceKey ?? "none");
-            }
-        }
-        else
-        {
-            _nowPlaying = null;
-            if (Soundboard.IsActive)
-            {
-                if (!_pipeline.IsTransmitting)
-                    BeginTransmissionLocked(forSoundboardOnly: true);
-            }
-            else
-                EnterIdleLocked("decode failure — queue empty");
-        }
-
-        RaiseNowPlayingChanged();
-        RaiseQueueChanged();
-    }
-
-    private void HandleTrackFinishedLocked()
-    {
-        PlaybackQueueItem? finished = _nowPlaying;
-
-        if (finished is not null)
-        {
-            finished.Status = PlaybackQueueStatus.Played;
-            if (_playHistory.Count == 0 || _playHistory.Peek().SourceKey != finished.SourceKey)
-                _playHistory.Push(CloneQueueItem(finished));
-            _logger.LogInformation("Track finished: {SourceKey}", finished.SourceKey);
-        }
-
-        var queuedCount = _queue.Count(i => i.Status == PlaybackQueueStatus.Queued);
-        _logger.LogDebug(
-            "Queue state after EOF: queued={QueuedCount}, played={PlayedCount}, total={Total}",
-            queuedCount,
-            _queue.Count(i => i.Status == PlaybackQueueStatus.Played),
-            _queue.Count);
-
-        if (queuedCount > 0)
-        {
-            _logger.LogInformation("Queue advancing to next track ({QueuedCount} remaining in queue)", queuedCount);
-
-            if (!TryAdvanceQueueLocked())
-            {
-                _logger.LogError("Queue advance failed despite {QueuedCount} queued items — entering idle", queuedCount);
-                _nowPlaying = null;
-                if (Soundboard.IsActive)
-                {
-                    if (!_pipeline.IsTransmitting)
-                        BeginTransmissionLocked(forSoundboardOnly: true);
-                }
-                else if (!HasPendingYouTubeAdvanceLocked())
-                    EnterIdleLocked("queue advance failed");
-            }
-            else
-            {
-                PrefetchNextQueuedLocked();
-                _pipeline.ResyncForNewTrack();
-                if (!_pipeline.IsTransmitting)
-                    BeginTransmissionLocked();
-            }
-        }
-        else
-        {
-            _nowPlaying = null;
-            if (Soundboard.IsActive)
-            {
-                if (!_pipeline.IsTransmitting)
-                    BeginTransmissionLocked(forSoundboardOnly: true);
-            }
-            else
-                EnterIdleLocked("queue finished");
-        }
-
-        RaiseNowPlayingChanged();
-        RaiseQueueChanged();
-
-        Music.NotifyTrackEndedEvent();
-    }
-
-    private bool TryAdvanceQueueLocked()
-    {
-        var maxAttempts = Math.Max(_queue.Count, 1);
-        var skipped = 0;
-
-        while (skipped < maxAttempts)
-        {
-            var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
-            if (next is null)
-            {
-                if (skipped > 0)
-                    _logger.LogWarning("TryAdvanceQueue: no playable items after skipping {Skipped} failed track(s)", skipped);
-                else
-                    _logger.LogWarning("TryAdvanceQueue: no item with Queued status");
-                return false;
-            }
-
-            foreach (var item in _queue)
-            {
-                if (item.Status == PlaybackQueueStatus.Playing)
-                    item.Status = PlaybackQueueStatus.Queued;
-            }
-
-            if (next.SourceKind == PlaybackSourceKind.YouTube)
-            {
-                if (_prefetchCache is null || !_prefetchCache.TryTakeReady(next, out var youtubeHandle) || youtubeHandle is null)
-                {
-                    ScheduleAsyncYouTubeAdvance();
-                    return false;
-                }
-
-                next.Status = PlaybackQueueStatus.Playing;
-                _nowPlaying = next;
-
-                try
-                {
-                    OpenQueueItemLocked(next, openedStream: youtubeHandle);
-                    Music.Play();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to open/play queued YouTube track: {SourceKey}", next.SourceKey);
-                    next.Status = PlaybackQueueStatus.Failed;
-                    _nowPlaying = null;
-                    skipped++;
-                    ScheduleAsyncYouTubeAdvance();
-                    continue;
-                }
-
-                PrefetchNextQueuedLocked();
-                _logger.LogInformation(
-                    "Now playing: {SourceKey} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
-                    next.SourceKey, Music.IsPlaying, _pipeline.IsTransmitting);
-                return true;
-            }
-
-            next.Status = PlaybackQueueStatus.Playing;
-            _nowPlaying = next;
-
             try
             {
-                OpenQueueItemLocked(next);
-                Music.Play();
+                await AdvanceToQueueItemAsync(target, CancellationToken.None);
             }
-            catch (Exception ex)
+            finally
             {
-                _logger.LogError(ex, "Failed to open/play queued track: {SourceKey} — skipping to next", next.SourceKey);
-                next.Status = PlaybackQueueStatus.Failed;
-                _nowPlaying = null;
-                skipped++;
-
-                if (next.SourceKind == PlaybackSourceKind.YouTube)
-                    ScheduleAsyncYouTubeAdvance();
-
-                continue;
+                SetAdvancePending(false);
             }
-
-            PrefetchNextQueuedLocked();
-
-            if (skipped > 0)
-            {
-                _logger.LogInformation(
-                    "Queue auto-skipped {Skipped} failed track(s), now playing: {SourceKey}",
-                    skipped, next.SourceKey);
-            }
-
-            _logger.LogInformation(
-                "Now playing: {SourceKey} (music.IsPlaying={IsPlaying}, pipeline.transmitting={Transmitting})",
-                next.SourceKey, Music.IsPlaying, _pipeline.IsTransmitting);
-            return true;
-        }
-
-        _logger.LogError(
-            "TryAdvanceQueue: gave up after {MaxAttempts} consecutive failures — mixer remains alive",
-            maxAttempts);
-        return false;
+        });
     }
 
-    private void OnMixerReadException(Exception ex)
+    private async Task AdvanceToQueueItemAsync(PlaybackQueueItem target, CancellationToken cancellationToken)
     {
-        if (Music.IsOutputting)
-            Music.AbortTrackDueToDecodeError(ex);
+        MediaLoadResult loadResult;
+        try
+        {
+            loadResult = await LoadMediaForItemAsync(target, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load media for {SourceKey}", target.SourceKey);
+            MarkQueueItemFailed(target.SourceKey);
+            return;
+        }
+
+        bool started;
+        lock (_sync)
+        {
+            var queueItem = _queue.FirstOrDefault(i => i.SourceKey == target.SourceKey);
+            if (queueItem is null || queueItem.Status == PlaybackQueueStatus.Failed)
+            {
+                loadResult.StreamHandle?.Dispose();
+                return;
+            }
+
+            started = StartQueueItemOnActiveDeckLocked(queueItem, loadResult);
+        }
+
+        if (started)
+        {
+            PrefetchNextQueuedLocked();
+            RaiseNowPlayingChanged();
+            RaiseQueueChanged();
+        }
+        else
+            loadResult.StreamHandle?.Dispose();
+    }
+
+    private async Task<MediaLoadResult> LoadMediaForItemAsync(
+        PlaybackQueueItem item,
+        CancellationToken cancellationToken)
+    {
+        if (_prefetchCache?.TryTakeReady(item, out var prefetched) == true && prefetched is not null)
+            return prefetched;
+
+        if (_prefetchCache is not null && _prefetchCache.IsInProgress(item))
+            return await _prefetchCache.WaitForReadyAsync(item, cancellationToken);
+
+        return await _mediaLoader.LoadAsync(item, cancellationToken: cancellationToken);
+    }
+
+    private void MarkQueueItemFailed(string sourceKey)
+    {
+        lock (_sync)
+        {
+            var item = _queue.FirstOrDefault(i => i.SourceKey == sourceKey);
+            if (item is not null)
+                item.Status = PlaybackQueueStatus.Failed;
+        }
+
+        RaiseQueueChanged();
+    }
+
+    private void MarkQueueItemFailedLocked(int index)
+    {
+        lock (_sync)
+        {
+            if (index >= 0 && index < _queue.Count)
+                _queue[index].Status = PlaybackQueueStatus.Failed;
+        }
+
+        RaiseQueueChanged();
     }
 
     private void BeginTransmissionLocked(bool forSoundboardOnly = false)
@@ -1076,107 +1127,31 @@ public sealed class AudioMixerService : IAudioMixerService
         _pipeline.Start();
         if (!forSoundboardOnly)
             _isPaused = false;
-        _logger.LogInformation(
-            "Voice transmission started (music.outputting={IsOutputting}, soundboard.active={SoundboardActive}, soundboardOnly={SoundboardOnly})",
-            Music.IsOutputting, Soundboard.IsActive, forSoundboardOnly);
     }
 
     private void StopTransmissionLocked(string reason)
     {
         _pipeline.Pause();
         _teamSpeak.VoiceTarget.LogTransmissionStopped(reason);
-        _logger.LogInformation(
-            "Voice transmission stopped ({Reason}) — pipeline paused, PreciseTimedPipe will stop requesting frames",
-            reason);
     }
 
     private void EnterIdleLocked(string reason)
     {
         StopTransmissionLocked(reason);
         _isPaused = false;
-        _logger.LogInformation(
-            "Mixer idle ({Reason}) — music.IsPlaying={IsPlaying}, soundboard.active={SoundboardActive}, nowPlaying={NowPlaying}",
-            reason, Music.IsPlaying, Soundboard.IsActive, _nowPlaying?.DisplayName ?? "none");
-    }
-
-    private bool HasActiveAudioLocked() =>
-        Music.IsOutputting || Soundboard.IsActive;
-
-    private void ProcessLifecycleLocked()
-    {
-        if (Music.TryConsumeTrackDecodeFailure(out var failedPath, out var decodeError))
-        {
-            _logger.LogWarning(
-                decodeError,
-                "ProcessLifecycle: decode failure consumed for {SourceKey} — mixer pipeline survives",
-                failedPath);
-            HandleTrackDecodeFailedLocked(decodeError);
-            return;
-        }
-
-        if (Music.TryConsumeTrackEnd(out var finishedPath))
-        {
-            _logger.LogInformation("ProcessLifecycle: EOF consumed for {SourceKey}", finishedPath);
-            HandleTrackFinishedLocked();
-            return;
-        }
-
-        if (Music.IsStalled(StalledReadThreshold))
-        {
-            _logger.LogWarning(
-                "ProcessLifecycle: stalled reads while playing {SourceKey} — forcing track end",
-                Music.CurrentFilePath);
-            Music.ForceTrackEnd();
-            return;
-        }
-
-        if (!HasActiveAudioLocked() && _pipeline.IsTransmitting)
-        {
-            _logger.LogInformation(
-                "ProcessLifecycle: no active sources while pipeline still transmitting — forcing idle (music.outputting={MusicOutputting}, sfxLive={SfxCount}, channelAttached={Attached})",
-                Music.IsOutputting, Soundboard.ActiveEffectCount, Soundboard.IsChannelAttached);
-            EnterIdleLocked("no active sources during read");
-        }
     }
 
     private void RaiseQueueChanged() => QueueChanged?.Invoke(this, EventArgs.Empty);
-
     private void RaiseNowPlayingChanged() => NowPlayingChanged?.Invoke(this, EventArgs.Empty);
 
-    private bool HasPendingYouTubeAdvanceLocked()
-    {
-        var next = _queue.FirstOrDefault(item => item.Status == PlaybackQueueStatus.Queued);
-        return next?.SourceKind == PlaybackSourceKind.YouTube;
-    }
-
-    private void ScheduleAsyncYouTubeAdvance()
-    {
-        if (_streamOpener is null)
-            return;
-
-        _ = Task.Run(async () =>
-        {
-            int index;
-            PlaybackQueueItem target;
-            lock (_sync)
-            {
-                index = _queue.FindIndex(item => item.Status == PlaybackQueueStatus.Queued);
-                if (index < 0)
-                    return;
-
-                target = _queue[index];
-                if (target.SourceKind != PlaybackSourceKind.YouTube)
-                    return;
-            }
-
-            await PlayYouTubeQueueItemAsync(index, target, CancellationToken.None);
-        });
-    }
+    private void RaiseDeckStateChangedLocked(DeckChannel deck) =>
+        DeckStateChanged?.Invoke(this, new DeckStateChangedEventArgs(deck.DeckId, deck.LoadedItem, deck.IsPlaying));
 
     public void Dispose()
     {
         Stop();
-        Music.Dispose();
+        DeckA.Dispose();
+        DeckB.Dispose();
         Soundboard.Dispose();
         Microphone.Dispose();
         _pipeline.Dispose();

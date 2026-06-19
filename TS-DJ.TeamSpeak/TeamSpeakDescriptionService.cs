@@ -28,8 +28,12 @@ public sealed class TeamSpeakDescriptionService
         _transitionTiming = transitionTiming;
 
         _mixer.NowPlayingChanged += OnNowPlayingChanged;
+        _mixer.DeckStateChanged += OnDeckStateChanged;
         _teamSpeakService.StateChanged += OnConnectionStateChanged;
     }
+
+    private void OnDeckStateChanged(object? sender, DeckStateChangedEventArgs e) =>
+        _ = UpdateFromNowPlayingAsync();
 
     public async Task ClearDescriptionAsync(CancellationToken cancellationToken = default)
     {
@@ -59,7 +63,7 @@ public sealed class TeamSpeakDescriptionService
 
     private async Task UpdateFromNowPlayingAsync(CancellationToken cancellationToken = default)
     {
-        var nowPlaying = _mixer.NowPlaying;
+        var nowPlaying = _mixer.NowPlaying ?? GetAudibleDeckItem();
 
         if (nowPlaying is null)
         {
@@ -127,5 +131,21 @@ public sealed class TeamSpeakDescriptionService
             _logger.LogWarning(ex, "Failed to update TeamSpeak description");
             _transitionTiming?.MarkTsDescriptionComplete(sw.Elapsed);
         }
+    }
+
+    private PlaybackQueueItem? GetAudibleDeckItem()
+    {
+        var active = _mixer.ActiveDeck.LoadedItem;
+        if (active is not null && _mixer.ActiveDeck.IsPlaying)
+            return active;
+
+        var deckA = _mixer.DeckA.LoadedItem;
+        var deckB = _mixer.DeckB.LoadedItem;
+        if (_mixer.DeckA.IsPlaying && deckA is not null)
+            return deckA;
+        if (_mixer.DeckB.IsPlaying && deckB is not null)
+            return deckB;
+
+        return active ?? deckA ?? deckB;
     }
 }

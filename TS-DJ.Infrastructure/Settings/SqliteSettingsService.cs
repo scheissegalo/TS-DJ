@@ -448,6 +448,57 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
         }
     }
 
+    public async Task<PlaybackSettings> LoadPlaybackSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, PlaybackSettings.ConfigKey, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return new PlaybackSettings();
+
+            var settings = JsonSerializer.Deserialize<PlaybackSettings>(raw);
+            return settings ?? new PlaybackSettings();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load playback settings from {DatabasePath}", _databasePath);
+            return new PlaybackSettings();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SavePlaybackSettingsAsync(PlaybackSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(settings);
+            await WriteSettingAsync(connection, transaction, PlaybackSettings.ConfigKey, json, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Saved playback settings to {DatabasePath}", _databasePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save playback settings to {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not save playback settings to '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task<TeamSpeakConnectionProfilesSettings> LoadTeamSpeakConnectionProfilesAsync(
         CancellationToken cancellationToken = default)
     {

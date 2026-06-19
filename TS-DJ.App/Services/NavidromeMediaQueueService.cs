@@ -4,44 +4,27 @@ using TS_DJ.Core.Services;
 namespace TS_DJ.App.Services;
 
 /// <summary>
-/// Enqueues Navidrome tracks through the shared playback queue in batch.
+/// Enqueues Navidrome tracks through the playback target (queue or deck).
 /// </summary>
 public sealed class NavidromeMediaQueueService : INavidromeMediaQueueService
 {
     private readonly INavidromeService _navidromeService;
-    private readonly IAudioMixerService _mixer;
-    private readonly IAudioPlaybackService _playback;
+    private readonly IPlaybackTargetService _playbackTarget;
 
     public NavidromeMediaQueueService(
         INavidromeService navidromeService,
-        IAudioMixerService mixer,
-        IAudioPlaybackService playback)
+        IPlaybackTargetService playbackTarget)
     {
         _navidromeService = navidromeService;
-        _mixer = mixer;
-        _playback = playback;
+        _playbackTarget = playbackTarget;
     }
 
-    public async Task<int> EnqueueTracksAsync(IReadOnlyList<NavidromeTrack> tracks, bool playImmediately)
+    public Task<int> EnqueueTracksAsync(IReadOnlyList<NavidromeTrack> tracks, bool playImmediately)
     {
         if (tracks.Count == 0)
-            return -1;
+            return Task.FromResult(-1);
 
         var items = tracks.Select(_navidromeService.CreateQueueItem).ToList();
-        _mixer.EnqueueRange(items);
-
-        if (!playImmediately)
-            return -1;
-
-        var firstKey = items[0].SourceKey;
-        var index = _mixer.Queue
-            .Select((item, idx) => (item, idx))
-            .FirstOrDefault(pair => pair.item.SourceKey == firstKey)
-            .idx;
-
-        if (index >= 0)
-            await _playback.PlayQueueItemAsync(index);
-
-        return index;
+        return _playbackTarget.LoadItemsAsync(items, playImmediately, replaceQueue: false);
     }
 }

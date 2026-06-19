@@ -27,6 +27,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly ILogService _logService;
     private readonly IPlaylistService _playlistService;
+    private readonly IPlaybackTargetService _playbackTarget;
     private readonly TeamSpeakNicknameService _nicknameService;
     private readonly TrackTransitionProfiler _transitionProfiler;
     private readonly DispatcherTimer _progressTimer;
@@ -65,6 +66,29 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private double _masterVolume = 50;
+
+    [ObservableProperty]
+    private PlaybackMode _playbackMode = PlaybackMode.SequentialQueue;
+
+    [ObservableProperty]
+    private bool _crossfadeEnabled;
+
+    [ObservableProperty]
+    private double _crossfadeDurationSeconds = 4;
+
+    [ObservableProperty]
+    private DeckId _selectedLoadDeck = DeckId.A;
+
+    public DeckId[] LoadDeckOptions { get; } = [DeckId.A, DeckId.B];
+
+    public DeckViewModel DeckA { get; } = new(DeckId.A);
+    public DeckViewModel DeckB { get; } = new(DeckId.B);
+
+    public bool IsDualDeckMode => PlaybackMode == PlaybackMode.DualDeck;
+    public bool IsSequentialMode => PlaybackMode == PlaybackMode.SequentialQueue;
+
+    public PlaybackMode[] PlaybackModeOptions { get; } =
+        [PlaybackMode.SequentialQueue, PlaybackMode.DualDeck];
 
     [ObservableProperty]
     private double _progressValue;
@@ -119,9 +143,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public bool CanConnect => !IsConnected && !IsConnecting && ConnectionProfiles.SelectedProfile is not null;
     public bool CanDisconnect => IsConnected;
-    public bool CanPlay => IsConnected && HasQueueItems && !IsPlaying && !IsPaused;
-    public bool CanPause => IsPlaying;
-    public bool CanStop => IsPlaying || IsPaused;
+    public bool CanPlay => IsConnected && (
+        PlaybackMode == PlaybackMode.DualDeck
+            ? (DeckA.HasLoadedTrack || DeckB.HasLoadedTrack)
+            : HasQueueItems && !IsPlaying && !IsPaused);
+
+    public bool CanLoadSelectedToDeck =>
+        IsConnected && IsDualDeckMode && SelectedQueueItem is not null;
+
+    public bool CanPlayDeckA => IsConnected && IsDualDeckMode && DeckA.HasLoadedTrack;
+    public bool CanPlayDeckB => IsConnected && IsDualDeckMode && DeckB.HasLoadedTrack;
+    public bool CanCueDeckA => IsConnected && IsDualDeckMode && DeckA.HasLoadedTrack;
+    public bool CanCueDeckB => IsConnected && IsDualDeckMode && DeckB.HasLoadedTrack;
+    public bool CanPause => IsPlaying || _audioMixerService.DeckA.IsPlaying || _audioMixerService.DeckB.IsPlaying;
+    public bool CanStop => IsPlaying || IsPaused || _audioMixerService.DeckA.IsPlaying || _audioMixerService.DeckB.IsPlaying;
     public bool CanBrowse => IsConnected;
     public bool CanSkipNext => IsConnected && (IsPlaying || IsPaused || HasQueuedItemsRemaining);
     public bool CanSkipPrevious => IsConnected && (_audioMixerService.CanSkipPrevious || IsPlaying || IsPaused);
@@ -154,6 +189,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ISettingsService settingsService,
         ILogService logService,
         IPlaylistService playlistService,
+        IPlaybackTargetService playbackTarget,
         TeamSpeakNicknameService nicknameService,
         TrackTransitionProfiler transitionProfiler,
         SoundboardViewModel soundboardViewModel,
@@ -168,6 +204,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settingsService = settingsService;
         _logService = logService;
         _playlistService = playlistService;
+        _playbackTarget = playbackTarget;
         _nicknameService = nicknameService;
         _transitionProfiler = transitionProfiler;
 
@@ -188,6 +225,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioPlaybackService.StateChanged += OnPlaybackStateChanged;
         _audioMixerService.QueueChanged += OnQueueChanged;
         _audioMixerService.NowPlayingChanged += OnNowPlayingChanged;
+        _audioMixerService.AdvancePendingChanged += OnAdvancePendingChanged;
+        _audioMixerService.DeckStateChanged += OnDeckStateChanged;
         _logService.EntryAdded += OnLogEntryAdded;
 
         _progressTimer = new DispatcherTimer
@@ -202,6 +241,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RefreshQueue();
         UpdateNowPlayingDisplay();
         ResetProgressDisplay();
+        SyncDeckDisplays();
 
         _ = LoadSettingsAsync();
     }
@@ -224,6 +264,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var uiSettings = await _settingsService.LoadUiSettingsAsync();
             IsSoundboardVisible = uiSettings.IsSoundboardVisible;
 
+            var playbackSettings = await _settingsService.LoadPlaybackSettingsAsync();
+            PlaybackMode = playbackSettings.Mode;
+            CrossfadeEnabled = playbackSettings.CrossfadeEnabled;
+            CrossfadeDurationSeconds = playbackSettings.CrossfadeDurationSeconds;
+
             await RefreshSavedPlaylistsAsync();
         }
         catch (Exception ex)
@@ -233,6 +278,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             _isLoadingSettings = false;
+            ApplyPlaybackSettings();
+            SyncDeckDisplays();
+            _playbackTarget.SelectedLoadDeck = SelectedLoadDeck;
         }
     }
 
@@ -682,7 +730,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var path = files[0].Path.LocalPath;
         try
         {
-            await _audioPlaybackService.LoadAsync(path);
+            if (IsDualDeckMode)
+            {
+                await _playbackTarget.LoadItemAsync(
+                    PlaybackQueueItem.FromLocalFile(path),
+                    playImmediately: false);
+            }
+            else
+            {
+                await _audioPlaybackService.LoadAsync(path);
+            }
+
             SelectedFile = path;
             _logger.LogInformation(
                 "Browse enqueued {Path} (mixer queue size={Size})",
@@ -717,6 +775,72 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         await _audioPlaybackService.SkipPreviousAsync();
         NotifyCommandStatesChanged();
     }
+
+    [RelayCommand(CanExecute = nameof(CanLoadSelectedToDeck))]
+    private async Task LoadSelectedToDeckAAsync() =>
+        await LoadSelectedToDeckAsync(DeckId.A);
+
+    [RelayCommand(CanExecute = nameof(CanLoadSelectedToDeck))]
+    private async Task LoadSelectedToDeckBAsync() =>
+        await LoadSelectedToDeckAsync(DeckId.B);
+
+    [RelayCommand(CanExecute = nameof(CanPlayDeckA))]
+    private async Task PlayDeckAAsync() => await _audioPlaybackService.PlayDeckAsync(DeckId.A);
+
+    [RelayCommand(CanExecute = nameof(CanPlayDeckB))]
+    private async Task PlayDeckBAsync() => await _audioPlaybackService.PlayDeckAsync(DeckId.B);
+
+    [RelayCommand(CanExecute = nameof(CanCueDeckA))]
+    private void CueDeckA()
+    {
+        _audioPlaybackService.CueDeck(DeckId.A);
+        SyncDeckDisplays();
+        NotifyCommandStatesChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCueDeckB))]
+    private void CueDeckB()
+    {
+        _audioPlaybackService.CueDeck(DeckId.B);
+        SyncDeckDisplays();
+        NotifyCommandStatesChanged();
+    }
+
+    private async Task LoadSelectedToDeckAsync(DeckId deckId)
+    {
+        if (SelectedQueueItem is null)
+            return;
+
+        var item = _audioMixerService.Queue.FirstOrDefault(i => i.SourceKey == SelectedQueueItem.SourceKey);
+        if (item is null)
+            return;
+
+        try
+        {
+            await _audioPlaybackService.LoadToDeckAsync(deckId, CloneQueueItem(item));
+            SyncDeckDisplays();
+            NotifyCommandStatesChanged();
+        }
+        catch (Exception ex)
+        {
+            LogError($"Failed to load track to deck {deckId}", ex);
+        }
+    }
+
+    private static PlaybackQueueItem CloneQueueItem(PlaybackQueueItem item) =>
+        new()
+        {
+            SourceKind = item.SourceKind,
+            FilePath = item.FilePath,
+            RemoteTrackId = item.RemoteTrackId,
+            VideoUrl = item.VideoUrl,
+            ThumbnailUrl = item.ThumbnailUrl,
+            DisplayName = item.DisplayName,
+            Artist = item.Artist,
+            Album = item.Album,
+            DurationSeconds = item.DurationSeconds,
+            Status = item.Status
+        };
 
     [RelayCommand]
     private async Task PlaySelectedQueueItemAsync()
@@ -808,6 +932,75 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     partial void OnHasQueueItemsChanged(bool value) => NotifyCommandStatesChanged();
+
+    partial void OnPlaybackModeChanged(PlaybackMode value)
+    {
+        OnPropertyChanged(nameof(IsDualDeckMode));
+        OnPropertyChanged(nameof(IsSequentialMode));
+        ApplyPlaybackSettings();
+        NotifyCommandStatesChanged();
+    }
+
+    partial void OnCrossfadeEnabledChanged(bool value) => ApplyPlaybackSettings();
+
+    partial void OnCrossfadeDurationSecondsChanged(double value) => ApplyPlaybackSettings();
+
+    partial void OnSelectedLoadDeckChanged(DeckId value) =>
+        _playbackTarget.SelectedLoadDeck = value;
+
+    private void ApplyPlaybackSettings()
+    {
+        if (_isLoadingSettings)
+            return;
+
+        var settings = new PlaybackSettings
+        {
+            Mode = PlaybackMode,
+            CrossfadeEnabled = CrossfadeEnabled,
+            CrossfadeDurationSeconds = CrossfadeDurationSeconds
+        };
+
+        _audioPlaybackService.SetPlaybackSettings(settings);
+        _ = SavePlaybackSettingsAsync();
+    }
+
+    private async Task SavePlaybackSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _settingsService.SavePlaybackSettingsAsync(new PlaybackSettings
+            {
+                Mode = PlaybackMode,
+                CrossfadeEnabled = CrossfadeEnabled,
+                CrossfadeDurationSeconds = CrossfadeDurationSeconds
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to save playback settings", ex);
+        }
+    }
+
+    private void OnDeckStateChanged(object? sender, DeckStateChangedEventArgs e) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            SyncDeckDisplays();
+            if (IsDualDeckMode && (DeckA.IsPlaying || DeckB.IsPlaying))
+            {
+                IsPlaying = true;
+                IsPaused = false;
+                PlaybackStatus = "Playing";
+            }
+
+            NotifyCommandStatesChanged();
+        });
+
+    private void SyncDeckDisplays()
+    {
+        DeckA.UpdateFrom(_audioMixerService.DeckA.LoadedItem, _audioMixerService.DeckA.IsPlaying);
+        DeckB.UpdateFrom(_audioMixerService.DeckB.LoadedItem, _audioMixerService.DeckB.IsPlaying);
+        NotifyCommandStatesChanged();
+    }
 
     private void ScheduleAudioSettingsSave()
     {
@@ -909,6 +1102,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnNowPlayingChanged(object? sender, EventArgs e) =>
         SchedulePlaybackUiSync(resetProgress: true);
+
+    private void OnAdvancePendingChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(UpdatePlaybackStatusDisplay);
+
+    private void UpdatePlaybackStatusDisplay()
+    {
+        if (_audioMixerService.AdvancePending
+            && (_audioMixerService.DeckA.IsPlaying || _audioMixerService.DeckB.IsPlaying))
+        {
+            PlaybackStatus = "Preparing next track…";
+            return;
+        }
+
+        if (IsPlaying)
+            PlaybackStatus = "Playing";
+        else if (IsPaused)
+            PlaybackStatus = "Paused";
+        else
+            PlaybackStatus = "Stopped";
+    }
 
     private void SchedulePlaybackUiSync(bool resetProgress = false)
     {
@@ -1087,6 +1300,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CanSkipPrevious));
         OnPropertyChanged(nameof(CanRemoveQueueItem));
         OnPropertyChanged(nameof(CanClearQueue));
+        OnPropertyChanged(nameof(CanLoadSelectedToDeck));
+        OnPropertyChanged(nameof(CanPlayDeckA));
+        OnPropertyChanged(nameof(CanPlayDeckB));
+        OnPropertyChanged(nameof(CanCueDeckA));
+        OnPropertyChanged(nameof(CanCueDeckB));
+        LoadSelectedToDeckACommand.NotifyCanExecuteChanged();
+        LoadSelectedToDeckBCommand.NotifyCanExecuteChanged();
+        PlayDeckACommand.NotifyCanExecuteChanged();
+        PlayDeckBCommand.NotifyCanExecuteChanged();
+        CueDeckACommand.NotifyCanExecuteChanged();
+        CueDeckBCommand.NotifyCanExecuteChanged();
     }
 
     private void LogError(string message, Exception ex)
@@ -1120,6 +1344,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioPlaybackService.StateChanged -= OnPlaybackStateChanged;
         _audioMixerService.QueueChanged -= OnQueueChanged;
         _audioMixerService.NowPlayingChanged -= OnNowPlayingChanged;
+        _audioMixerService.AdvancePendingChanged -= OnAdvancePendingChanged;
+        _audioMixerService.DeckStateChanged -= OnDeckStateChanged;
         _logService.EntryAdded -= OnLogEntryAdded;
         Soundboard.Dispose();
     }

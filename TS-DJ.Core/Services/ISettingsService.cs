@@ -22,6 +22,9 @@ public interface ISettingsService
     Task<YtDlpSettings> LoadYtDlpSettingsAsync(CancellationToken cancellationToken = default);
     Task SaveYtDlpSettingsAsync(YtDlpSettings settings, CancellationToken cancellationToken = default);
 
+    Task<PlaybackSettings> LoadPlaybackSettingsAsync(CancellationToken cancellationToken = default);
+    Task SavePlaybackSettingsAsync(PlaybackSettings settings, CancellationToken cancellationToken = default);
+
     Task<TeamSpeakConnectionProfilesSettings> LoadTeamSpeakConnectionProfilesAsync(CancellationToken cancellationToken = default);
     Task SaveTeamSpeakConnectionProfilesAsync(TeamSpeakConnectionProfilesSettings settings, CancellationToken cancellationToken = default);
 
