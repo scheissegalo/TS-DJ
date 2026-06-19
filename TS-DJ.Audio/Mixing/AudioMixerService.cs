@@ -213,6 +213,34 @@ public sealed class AudioMixerService : IAudioMixerService
         RaiseQueueChanged();
     }
 
+    public void UpdateQueueItemMetadata(
+        string sourceKey,
+        string? displayName = null,
+        string? artist = null,
+        int? durationSeconds = null)
+    {
+        if (string.IsNullOrWhiteSpace(sourceKey))
+            return;
+
+        lock (_sync)
+        {
+            var item = _queue.FirstOrDefault(i => i.SourceKey == sourceKey);
+            if (item is null)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+                item.DisplayName = displayName;
+
+            if (artist is not null)
+                item.Artist = string.IsNullOrWhiteSpace(artist) ? null : artist;
+
+            if (durationSeconds is > 0)
+                item.DurationSeconds = durationSeconds;
+        }
+
+        RaiseQueueChanged();
+    }
+
     public void EnqueueRange(IEnumerable<PlaybackQueueItem> items)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -246,9 +274,6 @@ public sealed class AudioMixerService : IAudioMixerService
                 "Queue enqueue range: {Added} item(s) (queue size={QueueSize}, queued={QueuedCount})",
                 added, _queue.Count, _queue.Count(i => i.Status == PlaybackQueueStatus.Queued));
         }
-
-        foreach (var item in enqueued)
-            _prefetchCache?.StartPrefetch(item);
 
         RaiseQueueChanged();
     }

@@ -38,8 +38,13 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<INavidromeService>(sp => sp.GetRequiredService<NavidromeService>());
 
+        services.AddSingleton<YtDlpProcessRunner>();
+        services.AddSingleton<JsRuntimeLocator>();
+        services.AddSingleton<YtDlpCommandBuilder>();
+        services.AddSingleton<YtDlpDiagnostics>();
         services.AddSingleton<YtDlpLocator>();
-        services.AddSingleton<YtDlpService>();
+        services.AddSingleton<YoutubeService>();
+        services.AddSingleton<IYoutubeService>(sp => sp.GetRequiredService<YoutubeService>());
         services.AddSingleton<YoutubeMediaSource>();
         services.AddSingleton<IMediaSource, LocalFileMediaSource>();
         services.AddSingleton<IMediaSource, NavidromeMediaSource>();

@@ -107,14 +107,35 @@
                 <TextBlock Text="YouTube / yt-dlp" FontSize="16" FontWeight="SemiBold"/>
                 <TextBlock Text="Optional override for the yt-dlp executable. Leave empty to use the bundled binary or PATH."
                            TextWrapping="Wrap" Opacity="0.75"/>
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+
+                <Border Padding="12" CornerRadius="6" Background="#151515" BorderBrush="#333" BorderThickness="1">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Status" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding StatusDisplay}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding VersionDisplay, StringFormat=yt-dlp version: {0}}" Opacity="0.85"/>
+                        <TextBlock Text="{Binding JsRuntimeStatusDisplay, StringFormat=JS runtime: {0}}" TextWrapping="Wrap" Opacity="0.85"/>
+                    </StackPanel>
+                </Border>
+
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Executable path" VerticalAlignment="Center"/>
                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ExecutablePath}" PlaceholderText="Optional"/>
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Resolved" VerticalAlignment="Center"/>
                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ResolvedPathDisplay}" TextWrapping="Wrap" Opacity="0.85"/>
 
-                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="JS runtime" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Row="2" Grid.Column="1"
+                              ItemsSource="{Binding JsRuntimeOptions}"
+                              SelectedItem="{Binding JsRuntime}"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="JS runtime path" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding JsRuntimePath}" PlaceholderText="Optional bundled or custom path"/>
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Remote EJS" VerticalAlignment="Center"/>
+                    <CheckBox Grid.Row="4" Grid.Column="1" Content="Fetch EJS solver scripts (ejs:github)" IsChecked="{Binding EnableRemoteEjsComponents}"/>
+
+                    <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="8">
                         <Button Content="Test yt-dlp" Command="{Binding TestYtDlpCommand}"/>
                         <TextBlock Text="{Binding TestResult}" VerticalAlignment="Center" Opacity="0.85"/>
                     </StackPanel>

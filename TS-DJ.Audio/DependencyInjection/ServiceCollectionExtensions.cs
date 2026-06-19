@@ -10,7 +10,10 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddTsDjAudio(this IServiceCollection services)
     {
-        services.AddSingleton<PlaybackStreamPrefetchCache>();
+        services.AddSingleton<PlaybackStreamPrefetchCache>(sp =>
+            new PlaybackStreamPrefetchCache(
+                sp.GetRequiredService<IPlaybackStreamOpener>(),
+                sp.GetService<Microsoft.Extensions.Logging.ILogger<PlaybackStreamPrefetchCache>>()));
         services.AddSingleton<AudioMixerService>(sp =>
         {
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AudioMixerService>>();

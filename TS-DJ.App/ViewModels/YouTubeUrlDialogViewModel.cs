@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using TS_DJ.App.Services;
 using TS_DJ.Infrastructure.Media;
@@ -29,6 +28,9 @@ public partial class YouTubeUrlDialogViewModel : ViewModelBase
     private bool _hasPreview;
 
     [ObservableProperty]
+    private bool _isPlaylistMode;
+
+    [ObservableProperty]
     private string _previewTitle = string.Empty;
 
     [ObservableProperty]
@@ -38,9 +40,18 @@ public partial class YouTubeUrlDialogViewModel : ViewModelBase
     private string _previewDuration = string.Empty;
 
     [ObservableProperty]
+    private string _previewVideoCount = string.Empty;
+
+    [ObservableProperty]
     private string? _previewThumbnailUrl;
 
     public bool CanConfirm => !IsBusy && HasPreview && !HasError;
+
+    public bool IsSingleVideoMode => !IsPlaylistMode;
+
+    public string AddButtonText => IsPlaylistMode ? "Add Playlist To Queue" : "Add to Queue";
+
+    public string PlayButtonText => IsPlaylistMode ? "Play Playlist Now" : "Play Now";
 
     public YouTubeUrlDialogViewModel(
         ILogger<YouTubeUrlDialogViewModel> logger,
@@ -55,53 +66,60 @@ public partial class YouTubeUrlDialogViewModel : ViewModelBase
     partial void OnUrlChanged(string value)
     {
         HasPreview = false;
+        IsPlaylistMode = false;
         HasError = false;
         StatusMessage = string.Empty;
         _ = ResolveMetadataAsync();
     }
 
-    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanConfirm));
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanConfirm));
+        OnPropertyChanged(nameof(AddButtonText));
+        OnPropertyChanged(nameof(PlayButtonText));
+    }
 
-    partial void OnHasPreviewChanged(bool value) => OnPropertyChanged(nameof(CanConfirm));
+    partial void OnHasPreviewChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanConfirm));
+        OnPropertyChanged(nameof(AddButtonText));
+        OnPropertyChanged(nameof(PlayButtonText));
+    }
 
     partial void OnHasErrorChanged(bool value) => OnPropertyChanged(nameof(CanConfirm));
+
+    partial void OnIsPlaylistModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsSingleVideoMode));
+        OnPropertyChanged(nameof(AddButtonText));
+        OnPropertyChanged(nameof(PlayButtonText));
+    }
 
     private async Task ResolveMetadataAsync()
     {
         if (string.IsNullOrWhiteSpace(Url))
             return;
 
-        if (!YoutubeUrlHelper.IsYouTubeUrl(Url))
+        if (!YoutubeUrlHelper.TryClassify(Url, out var classification))
         {
             HasError = true;
             HasPreview = false;
-            StatusMessage = "Enter a valid YouTube video URL.";
+            StatusMessage = "Enter a valid YouTube video or playlist URL.";
             return;
         }
 
         IsBusy = true;
         HasError = false;
-        StatusMessage = "Resolving video metadata…";
 
         try
         {
-            var item = await _youtubeMediaSource.TryCreateFromInputAsync(Url);
-            if (item is null)
+            if (classification.Kind == YoutubeContentKind.Playlist)
             {
-                HasError = true;
-                HasPreview = false;
-                StatusMessage = "Invalid YouTube URL.";
+                await ResolvePlaylistPreviewAsync();
                 return;
             }
 
-            PreviewTitle = item.DisplayName;
-            PreviewUploader = item.Artist ?? "Unknown uploader";
-            PreviewDuration = item.DurationSeconds is > 0
-                ? FormatDuration(item.DurationSeconds.Value)
-                : "Unknown duration";
-            PreviewThumbnailUrl = item.ThumbnailUrl;
-            HasPreview = true;
-            StatusMessage = "Ready to add or play.";
+            await ResolveSingleVideoPreviewAsync();
         }
         catch (YtDlpException ex)
         {
@@ -114,13 +132,53 @@ public partial class YouTubeUrlDialogViewModel : ViewModelBase
         {
             HasError = true;
             HasPreview = false;
-            StatusMessage = "Failed to resolve YouTube video.";
+            StatusMessage = "Failed to resolve YouTube URL.";
             _logger.LogError(ex, "YouTube metadata resolution failed");
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private async Task ResolveSingleVideoPreviewAsync()
+    {
+        StatusMessage = "Resolving video metadata…";
+        IsPlaylistMode = false;
+
+        var item = await _youtubeMediaSource.TryCreateFromInputAsync(Url);
+        if (item is null)
+        {
+            HasError = true;
+            HasPreview = false;
+            StatusMessage = "Invalid YouTube video URL.";
+            return;
+        }
+
+        PreviewTitle = item.DisplayName;
+        PreviewUploader = item.Artist ?? "Unknown uploader";
+        PreviewDuration = item.DurationSeconds is > 0
+            ? FormatDuration(item.DurationSeconds.Value)
+            : "Unknown duration";
+        PreviewVideoCount = string.Empty;
+        PreviewThumbnailUrl = item.ThumbnailUrl;
+        HasPreview = true;
+        StatusMessage = "Ready to add or play.";
+    }
+
+    private async Task ResolvePlaylistPreviewAsync()
+    {
+        StatusMessage = "Resolving playlist metadata…";
+        IsPlaylistMode = true;
+
+        var playlist = await _youtubeMediaQueueService.FetchPlaylistPreviewAsync(Url);
+        PreviewTitle = playlist.Title;
+        PreviewUploader = "YouTube Playlist";
+        PreviewDuration = string.Empty;
+        PreviewVideoCount = $"{playlist.VideoCount} videos";
+        PreviewThumbnailUrl = null;
+        HasPreview = true;
+        StatusMessage = "Ready to import playlist.";
     }
 
     public async Task<bool> AddToQueueAsync()
@@ -142,11 +200,24 @@ public partial class YouTubeUrlDialogViewModel : ViewModelBase
     private async Task<bool> EnqueueAsync(bool playImmediately)
     {
         IsBusy = true;
-        StatusMessage = playImmediately ? "Starting playback…" : "Adding to queue…";
+        StatusMessage = playImmediately
+            ? IsPlaylistMode ? "Starting playlist…" : "Starting playback…"
+            : IsPlaylistMode ? "Importing playlist…" : "Adding to queue…";
 
         try
         {
-            await _youtubeMediaQueueService.EnqueueUrlAsync(Url, playImmediately);
+            if (IsPlaylistMode)
+            {
+                await _youtubeMediaQueueService.EnqueuePlaylistAsync(
+                    Url,
+                    playImmediately,
+                    replaceQueue: playImmediately);
+            }
+            else
+            {
+                await _youtubeMediaQueueService.EnqueueUrlAsync(Url, playImmediately);
+            }
+
             return true;
         }
         catch (YtDlpException ex)
@@ -159,7 +230,9 @@ public partial class YouTubeUrlDialogViewModel : ViewModelBase
         catch (Exception ex)
         {
             HasError = true;
-            StatusMessage = "Failed to enqueue YouTube video.";
+            StatusMessage = IsPlaylistMode
+                ? "Failed to import YouTube playlist."
+                : "Failed to enqueue YouTube video.";
             _logger.LogError(ex, "YouTube enqueue failed");
             return false;
         }

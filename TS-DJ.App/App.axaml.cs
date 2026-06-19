@@ -11,6 +11,7 @@ using TS_DJ.Core.Services;
 using TS_DJ.Audio.DependencyInjection;
 using TS_DJ.Infrastructure.DependencyInjection;
 using TS_DJ.Infrastructure.Logging;
+using TS_DJ.Infrastructure.YtDlp;
 using TS_DJ.TeamSpeak;
 using TS_DJ.TeamSpeak.DependencyInjection;
 
@@ -40,6 +41,7 @@ public partial class App : Application
                 services.AddSingleton<INavidromeMediaQueueService>(sp => sp.GetRequiredService<NavidromeMediaQueueService>());
                 services.AddSingleton<YoutubeMediaQueueService>();
                 services.AddSingleton<IYoutubeMediaQueueService>(sp => sp.GetRequiredService<YoutubeMediaQueueService>());
+                services.AddSingleton<YoutubePlaylistEnrichmentService>();
                 services.AddTransient<NavidromeBrowserViewModel>();
                 services.AddTransient<YouTubeUrlDialogViewModel>();
                 services.AddSingleton<ConnectionProfileSelectorViewModel>();
@@ -76,6 +78,19 @@ public partial class App : Application
             appLogger.LogError("Failed to load libopus — Opus encoding will not work");
 
         appLogger.LogInformation("TS-DJ started");
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var diagnostics = _host.Services.GetRequiredService<YtDlpDiagnostics>();
+                await diagnostics.LogStartupAsync();
+            }
+            catch (Exception ex)
+            {
+                appLogger.LogWarning(ex, "YouTube startup diagnostics failed");
+            }
+        });
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

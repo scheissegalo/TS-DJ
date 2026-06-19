@@ -21,6 +21,7 @@ public interface IAudioMixerService : IDisposable
     void EnqueueRange(IEnumerable<PlaybackQueueItem> items);
     void RemoveFromQueue(int index);
     void ClearQueue();
+    void UpdateQueueItemMetadata(string sourceKey, string? displayName = null, string? artist = null, int? durationSeconds = null);
     void PlayQueueItem(int index);
     Task PlayQueueItemAsync(int index, CancellationToken cancellationToken = default);
     void SkipNext();

@@ -3142,7 +3142,7 @@
           "bin/placeholder/Splamy.TSLib.dll": {}
         }
       },
-      "TS-DJ.Audio/0.3.3": {
+      "TS-DJ.Audio/0.3.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
@@ -3152,8 +3152,8 @@
           "NLayer": "1.15.0",
           "NLayer.NAudioSupport": "1.4.0",
           "Splamy.TSLib": "1.1.0",
-          "TS-DJ.Core": "0.3.3",
-          "TS-DJ.TeamSpeak": "0.3.3"
+          "TS-DJ.Core": "0.3.4",
+          "TS-DJ.TeamSpeak": "0.3.4"
         },
         "compile": {
           "bin/placeholder/TS-DJ.Audio.dll": {}
@@ -3162,7 +3162,7 @@
           "bin/placeholder/TS-DJ.Audio.dll": {}
         }
       },
-      "TS-DJ.Core/0.3.3": {
+      "TS-DJ.Core/0.3.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "compile": {
@@ -3172,7 +3172,7 @@
           "bin/placeholder/TS-DJ.Core.dll": {}
         }
       },
-      "TS-DJ.Infrastructure/0.3.3": {
+      "TS-DJ.Infrastructure/0.3.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
@@ -3181,7 +3181,7 @@
           "Microsoft.Extensions.Http": "8.0.1",
           "Microsoft.Extensions.Logging": "8.0.1",
           "Microsoft.Extensions.Logging.Console": "8.0.1",
-          "TS-DJ.Core": "0.3.3"
+          "TS-DJ.Core": "0.3.4"
         },
         "compile": {
           "bin/placeholder/TS-DJ.Infrastructure.dll": {}
@@ -3190,13 +3190,13 @@
           "bin/placeholder/TS-DJ.Infrastructure.dll": {}
         }
       },
-      "TS-DJ.TeamSpeak/0.3.3": {
+      "TS-DJ.TeamSpeak/0.3.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
           "Splamy.TSLib": "1.1.0",
-          "TS-DJ.Core": "0.3.3"
+          "TS-DJ.Core": "0.3.4"
         },
         "compile": {
           "bin/placeholder/TS-DJ.TeamSpeak.dll": {}
@@ -9030,22 +9030,22 @@
       "path": "../TSLib/TSLib.csproj",
       "msbuildProject": "../TSLib/TSLib.csproj"
     },
-    "TS-DJ.Audio/0.3.3": {
+    "TS-DJ.Audio/0.3.4": {
       "type": "project",
       "path": "../TS-DJ.Audio/TS-DJ.Audio.csproj",
       "msbuildProject": "../TS-DJ.Audio/TS-DJ.Audio.csproj"
     },
-    "TS-DJ.Core/0.3.3": {
+    "TS-DJ.Core/0.3.4": {
       "type": "project",
       "path": "../TS-DJ.Core/TS-DJ.Core.csproj",
       "msbuildProject": "../TS-DJ.Core/TS-DJ.Core.csproj"
     },
-    "TS-DJ.Infrastructure/0.3.3": {
+    "TS-DJ.Infrastructure/0.3.4": {
       "type": "project",
       "path": "../TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
       "msbuildProject": "../TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj"
     },
-    "TS-DJ.TeamSpeak/0.3.3": {
+    "TS-DJ.TeamSpeak/0.3.4": {
       "type": "project",
       "path": "../TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
       "msbuildProject": "../TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj"
@@ -9063,17 +9063,17 @@
       "Microsoft.Extensions.Hosting >= 8.0.1",
       "Microsoft.Extensions.Logging >= 8.0.1",
       "Microsoft.Extensions.Logging.Console >= 8.0.1",
-      "TS-DJ.Audio >= 0.3.3",
-      "TS-DJ.Core >= 0.3.3",
-      "TS-DJ.Infrastructure >= 0.3.3",
-      "TS-DJ.TeamSpeak >= 0.3.3"
+      "TS-DJ.Audio >= 0.3.4",
+      "TS-DJ.Core >= 0.3.4",
+      "TS-DJ.Infrastructure >= 0.3.4",
+      "TS-DJ.TeamSpeak >= 0.3.4"
     ]
   },
   "packageFolders": {
     "/home/berni/.nuget/packages/": {}
   },
   "project": {
-    "version": "0.3.3",
+    "version": "0.3.4",
     "restore": {
       "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
       "projectName": "TS-DJ.App",

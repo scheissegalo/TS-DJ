@@ -14,11 +14,11 @@ public sealed class PlaybackQueueItem
     public string FilePath { get; init; } = string.Empty;
     public string? RemoteTrackId { get; init; }
     public string? VideoUrl { get; init; }
-    public string? ThumbnailUrl { get; init; }
-    public string DisplayName { get; init; } = string.Empty;
-    public string? Artist { get; init; }
+    public string? ThumbnailUrl { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public string? Artist { get; set; }
     public string? Album { get; init; }
-    public int? DurationSeconds { get; init; }
+    public int? DurationSeconds { get; set; }
     public PlaybackQueueStatus Status { get; set; } = PlaybackQueueStatus.Queued;
 
     /// <summary>

@@ -100,7 +100,9 @@ Navidrome exposes a Subsonic-compatible API; any compatible server may work but 
 
 ## YouTube
 
-Open **YouTube…** from the playback panel (requires an active TS connection). Paste a single video URL (`youtube.com/watch`, `youtu.be`, or `music.youtube.com`). TS-DJ resolves title, uploader, and duration via yt-dlp, then either adds the track to the queue or starts playback immediately.
+Open **YouTube…** from the playback panel (requires an active TS connection). Paste a single video URL or a playlist URL (`playlist?list=…` or `watch?v=…&list=…`). TS-DJ resolves title, uploader, and duration via yt-dlp, then either adds the track to the queue or starts playback immediately.
+
+**Playlists:** When a playlist URL is detected, TS-DJ shows a confirmation with the playlist title and video count. Choose **Add Playlist To Queue** or **Play Playlist Now** (clears the queue first, matching saved-playlist behavior). Import uses yt-dlp `--flat-playlist` metadata only — stream URLs are resolved lazily when each track becomes active. Titles and durations may update in the queue as background enrichment completes.
 
 Saved playlists store the canonical video URL and metadata — not temporary stream URLs. On playback, audio is re-resolved through yt-dlp.
 

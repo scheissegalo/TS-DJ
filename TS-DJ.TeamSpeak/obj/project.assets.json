@@ -627,7 +627,7 @@
           "bin/placeholder/Splamy.TSLib.dll": {}
         }
       },
-      "TS-DJ.Core/0.3.3": {
+      "TS-DJ.Core/0.3.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "compile": {
@@ -2622,7 +2622,7 @@
       "path": "../TSLib/TSLib.csproj",
       "msbuildProject": "../TSLib/TSLib.csproj"
     },
-    "TS-DJ.Core/0.3.3": {
+    "TS-DJ.Core/0.3.4": {
       "type": "project",
       "path": "../TS-DJ.Core/TS-DJ.Core.csproj",
       "msbuildProject": "../TS-DJ.Core/TS-DJ.Core.csproj"
@@ -2632,14 +2632,14 @@
     "net8.0": [
       "Microsoft.Extensions.Logging.Abstractions >= 8.0.2",
       "Splamy.TSLib >= 1.1.0",
-      "TS-DJ.Core >= 0.3.3"
+      "TS-DJ.Core >= 0.3.4"
     ]
   },
   "packageFolders": {
     "/home/berni/.nuget/packages/": {}
   },
   "project": {
-    "version": "0.3.3",
+    "version": "0.3.4",
     "restore": {
       "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
       "projectName": "TS-DJ.TeamSpeak",

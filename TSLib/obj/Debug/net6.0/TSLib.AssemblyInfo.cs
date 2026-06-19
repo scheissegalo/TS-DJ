@@ -16,7 +16,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyDescriptionAttribute(("\n      A free and open source TeamSpeak 3 and 5 client library.\n      Can connect" +
     " as normal voice or query client and is optimized for performance.\n    "))]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+23cf202d80501a0f0d7930a3491925632a327cce")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+beef82ba2f37a188c1c3d617e0bcd59324fc85de")]
 [assembly: System.Reflection.AssemblyProductAttribute("TSLib")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TSLib")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.1.0.0")]

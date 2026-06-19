@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
 
@@ -10,11 +11,15 @@ namespace TS_DJ.Audio.Playback;
 public sealed class PlaybackStreamPrefetchCache
 {
     private readonly IPlaybackStreamOpener _streamOpener;
+    private readonly ILogger<PlaybackStreamPrefetchCache>? _logger;
     private readonly ConcurrentDictionary<string, PrefetchEntry> _entries = new(StringComparer.Ordinal);
 
-    public PlaybackStreamPrefetchCache(IPlaybackStreamOpener streamOpener)
+    public PlaybackStreamPrefetchCache(
+        IPlaybackStreamOpener streamOpener,
+        ILogger<PlaybackStreamPrefetchCache>? logger = null)
     {
         _streamOpener = streamOpener;
+        _logger = logger;
     }
 
     public void StartPrefetch(PlaybackQueueItem item)
@@ -73,8 +78,12 @@ public sealed class PlaybackStreamPrefetchCache
             {
                 return await _streamOpener.OpenPlaybackStreamAsync(item, CancellationToken.None);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger?.LogWarning(
+                    ex,
+                    "YouTube prefetch failed for {VideoUrl}; playback will retry when the track starts",
+                    item.VideoUrl);
                 return null;
             }
         });

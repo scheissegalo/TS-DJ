@@ -12,6 +12,7 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
     private readonly ILogger<YtDlpOptionsViewModel> _logger;
     private readonly ISettingsService _settingsService;
     private readonly YtDlpLocator _ytDlpLocator;
+    private readonly YtDlpDiagnostics _diagnostics;
     private CancellationTokenSource? _saveDebounceCts;
     private bool _isLoading;
 
@@ -19,19 +20,42 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
     private string _executablePath = string.Empty;
 
     [ObservableProperty]
+    private string _jsRuntimePath = string.Empty;
+
+    [ObservableProperty]
+    private YoutubeJsRuntimePreference _jsRuntime = YoutubeJsRuntimePreference.Auto;
+
+    [ObservableProperty]
+    private bool _enableRemoteEjsComponents = true;
+
+    [ObservableProperty]
     private string _resolvedPathDisplay = "Not resolved";
+
+    [ObservableProperty]
+    private string _versionDisplay = "Unknown";
+
+    [ObservableProperty]
+    private string _jsRuntimeStatusDisplay = "Not detected";
+
+    [ObservableProperty]
+    private string _statusDisplay = "Unknown";
 
     [ObservableProperty]
     private string _testResult = string.Empty;
 
+    public IReadOnlyList<YoutubeJsRuntimePreference> JsRuntimeOptions { get; } =
+        Enum.GetValues<YoutubeJsRuntimePreference>();
+
     public YtDlpOptionsViewModel(
         ILogger<YtDlpOptionsViewModel> logger,
         ISettingsService settingsService,
-        YtDlpLocator ytDlpLocator)
+        YtDlpLocator ytDlpLocator,
+        YtDlpDiagnostics diagnostics)
     {
         _logger = logger;
         _settingsService = settingsService;
         _ytDlpLocator = ytDlpLocator;
+        _diagnostics = diagnostics;
     }
 
     public async Task LoadAsync()
@@ -41,7 +65,10 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
         {
             var settings = await _settingsService.LoadYtDlpSettingsAsync();
             ExecutablePath = settings.ExecutablePath;
-            await RefreshResolvedPathAsync();
+            JsRuntimePath = settings.JsRuntimePath;
+            JsRuntime = settings.JsRuntime;
+            EnableRemoteEjsComponents = settings.EnableRemoteEjsComponents;
+            await RefreshDiagnosticsAsync();
         }
         catch (Exception ex)
         {
@@ -56,31 +83,55 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
     partial void OnExecutablePathChanged(string value)
     {
         ScheduleSave();
-        _ = RefreshResolvedPathAsync();
+        _ = RefreshDiagnosticsAsync();
     }
+
+    partial void OnJsRuntimePathChanged(string value)
+    {
+        ScheduleSave();
+        _ = RefreshDiagnosticsAsync();
+    }
+
+    partial void OnJsRuntimeChanged(YoutubeJsRuntimePreference value)
+    {
+        ScheduleSave();
+        _ = RefreshDiagnosticsAsync();
+    }
+
+    partial void OnEnableRemoteEjsComponentsChanged(bool value) => ScheduleSave();
 
     [RelayCommand]
     private async Task TestYtDlpAsync()
     {
         TestResult = string.Empty;
-        _ytDlpLocator.InvalidateCache();
-        var location = await _ytDlpLocator.LocateAsync();
-        if (location is null)
+        await RefreshDiagnosticsAsync();
+
+        var snapshot = _diagnostics.Current;
+        if (snapshot.Status == YoutubeDiagnosticsStatus.NotFound)
         {
             TestResult = "yt-dlp not found.";
             return;
         }
 
-        TestResult = $"OK — {location.Origin}: {location.Path}";
+        TestResult = snapshot.Status == YoutubeDiagnosticsStatus.Ready
+            ? $"OK — v{snapshot.YtDlpVersion ?? "?"}"
+            : snapshot.StatusMessage ?? snapshot.StatusDisplay;
     }
 
-    private async Task RefreshResolvedPathAsync()
+    private async Task RefreshDiagnosticsAsync()
     {
         _ytDlpLocator.InvalidateCache();
-        var location = await _ytDlpLocator.LocateAsync();
-        ResolvedPathDisplay = location is null
+        var snapshot = await _diagnostics.RefreshAsync();
+
+        ResolvedPathDisplay = snapshot.YtDlpPath is null
             ? "Not found (configure path or install on PATH)"
-            : $"{location.Origin}: {location.Path}";
+            : $"{snapshot.YtDlpOrigin}: {snapshot.YtDlpPath}";
+
+        VersionDisplay = snapshot.YtDlpVersion ?? "Unknown";
+        JsRuntimeStatusDisplay = snapshot.JsRuntimeStatus;
+        StatusDisplay = snapshot.StatusMessage is null
+            ? snapshot.StatusDisplay
+            : $"{snapshot.StatusDisplay} — {snapshot.StatusMessage}";
     }
 
     private void ScheduleSave()
@@ -101,7 +152,10 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
             await Task.Delay(300, cancellationToken);
             await _settingsService.SaveYtDlpSettingsAsync(new YtDlpSettings
             {
-                ExecutablePath = ExecutablePath.Trim()
+                ExecutablePath = ExecutablePath.Trim(),
+                JsRuntimePath = JsRuntimePath.Trim(),
+                JsRuntime = JsRuntime,
+                EnableRemoteEjsComponents = EnableRemoteEjsComponents
             }, cancellationToken);
             _ytDlpLocator.InvalidateCache();
         }

@@ -4,16 +4,16 @@
         x:Class="TS_DJ.App.Views.YouTubeUrlDialog"
         x:DataType="vm:YouTubeUrlDialogViewModel"
         Title="YouTube URL"
-        Width="520"
-        Height="320"
+        Width="540"
+        Height="360"
         MinWidth="420"
-        MinHeight="280"
+        MinHeight="300"
         WindowStartupLocation="CenterOwner">
 
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="16" RowSpacing="10">
         <StackPanel Grid.Row="0" Spacing="4">
-            <TextBlock Text="YouTube video URL"/>
-            <TextBox Text="{Binding Url}" PlaceholderText="https://www.youtube.com/watch?v=…"/>
+            <TextBlock Text="YouTube video or playlist URL"/>
+            <TextBox Text="{Binding Url}" PlaceholderText="https://www.youtube.com/watch?v=… or playlist?list=…"/>
         </StackPanel>
 
         <TextBlock Grid.Row="1"
@@ -24,10 +24,14 @@
         <Border Grid.Row="2" Padding="12" CornerRadius="8" BorderThickness="1"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
                 IsVisible="{Binding HasPreview}">
-            <StackPanel Spacing="4">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Detected YouTube Playlist"
+                           FontWeight="SemiBold"
+                           IsVisible="{Binding IsPlaylistMode}"/>
                 <TextBlock Text="{Binding PreviewTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                <TextBlock Text="{Binding PreviewUploader}" Opacity="0.85"/>
-                <TextBlock Text="{Binding PreviewDuration}" Opacity="0.75"/>
+                <TextBlock Text="{Binding PreviewUploader}" Opacity="0.85" IsVisible="{Binding IsSingleVideoMode}"/>
+                <TextBlock Text="{Binding PreviewDuration}" Opacity="0.75" IsVisible="{Binding IsSingleVideoMode}"/>
+                <TextBlock Text="{Binding PreviewVideoCount}" Opacity="0.85" IsVisible="{Binding IsPlaylistMode}"/>
             </StackPanel>
         </Border>
 
@@ -35,8 +39,8 @@
 
         <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="Cancel" Click="CancelButton_OnClick"/>
-            <Button Content="Add to Queue" Click="AddToQueueButton_OnClick" IsEnabled="{Binding CanConfirm}"/>
-            <Button Content="Play Now" Click="PlayNowButton_OnClick" IsEnabled="{Binding CanConfirm}" IsDefault="True"/>
+            <Button Content="{Binding AddButtonText}" Click="AddToQueueButton_OnClick" IsEnabled="{Binding CanConfirm}"/>
+            <Button Content="{Binding PlayButtonText}" Click="PlayNowButton_OnClick" IsEnabled="{Binding CanConfirm}" IsDefault="True"/>
         </StackPanel>
     </Grid>
 </Window>

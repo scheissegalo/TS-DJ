@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
@@ -8,12 +7,17 @@ namespace TS_DJ.Infrastructure.YtDlp;
 public sealed class YtDlpLocator
 {
     private readonly ISettingsService _settingsService;
+    private readonly YtDlpProcessRunner _processRunner;
     private readonly ILogger<YtDlpLocator> _logger;
     private YtDlpLocationResult? _cached;
 
-    public YtDlpLocator(ISettingsService settingsService, ILogger<YtDlpLocator> logger)
+    public YtDlpLocator(
+        ISettingsService settingsService,
+        YtDlpProcessRunner processRunner,
+        ILogger<YtDlpLocator> logger)
     {
         _settingsService = settingsService;
+        _processRunner = processRunner;
         _logger = logger;
     }
 
@@ -89,25 +93,11 @@ public sealed class YtDlpLocator
 
         try
         {
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "which",
-                    Arguments = "yt-dlp",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-
-            if (process.ExitCode != 0)
-                return null;
+            var output = await new YtDlpProcessRunner().RunCaptureStdoutAsync(
+                "which",
+                ["yt-dlp"],
+                TimeSpan.FromSeconds(5),
+                cancellationToken);
 
             var resolved = output.Trim().Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim();
             return string.IsNullOrWhiteSpace(resolved) ? null : resolved;
@@ -118,36 +108,6 @@ public sealed class YtDlpLocator
         }
     }
 
-    private async Task<bool> ValidateExecutableAsync(string path, CancellationToken cancellationToken)
-    {
-        if (!File.Exists(path))
-            return false;
-
-        try
-        {
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = path,
-                    Arguments = "--version",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-
-            process.Start();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(15));
-            await process.WaitForExitAsync(cts.Token);
-            return process.ExitCode == 0;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "yt-dlp validation failed for {Path}", path);
-            return false;
-        }
-    }
+    private Task<bool> ValidateExecutableAsync(string path, CancellationToken cancellationToken) =>
+        _processRunner.ValidateExecutableAsync(path, TimeSpan.FromSeconds(15), cancellationToken);
 }
