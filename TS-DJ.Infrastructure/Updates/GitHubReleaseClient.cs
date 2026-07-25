@@ -8,18 +8,19 @@ namespace TS_DJ.Infrastructure.Updates;
 
 public sealed class GitHubReleaseClient
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<GitHubReleaseClient> _logger;
 
-    public GitHubReleaseClient(HttpClient httpClient, ILogger<GitHubReleaseClient> logger)
+    public GitHubReleaseClient(IHttpClientFactory httpClientFactory, ILogger<GitHubReleaseClient> logger)
     {
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
     public async Task<UpdateReleaseInfo?> GetLatestReleaseAsync(CancellationToken cancellationToken = default)
     {
-        var payload = await _httpClient.GetFromJsonAsync<GitHubReleasePayload>(
+        var httpClient = _httpClientFactory.CreateClient(UpdateConstants.HttpClientName);
+        var payload = await httpClient.GetFromJsonAsync<GitHubReleasePayload>(
             UpdateConstants.LatestReleaseApiUrl,
             cancellationToken);
 

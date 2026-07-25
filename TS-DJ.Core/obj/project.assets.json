@@ -11,7 +11,7 @@
     "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget": {}
   },
   "project": {
-    "version": "0.3.4",
+    "version": "0.3.6",
     "restore": {
       "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
       "projectName": "TS-DJ.Core",
