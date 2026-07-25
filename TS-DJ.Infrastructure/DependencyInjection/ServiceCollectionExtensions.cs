@@ -40,6 +40,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<YtDlpProcessRunner>();
         services.AddSingleton<JsRuntimeLocator>();
+        services.AddSingleton<FfmpegLocator>();
         services.AddSingleton<YtDlpCommandBuilder>();
         services.AddSingleton<YtDlpDiagnostics>();
         services.AddSingleton<YtDlpLocator>();

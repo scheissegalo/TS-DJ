@@ -219,30 +219,47 @@ public sealed class JsRuntimeLocator
 
     private static IEnumerable<string> GetBundledCandidates(string runtimeName, string[] binaryNames)
     {
-        var baseDir = AppContext.BaseDirectory;
-        var searchRoots = new[]
-        {
-            Path.Combine(baseDir, "tools", "js-runtimes", runtimeName),
-            Path.GetFullPath(Path.Combine(baseDir, "..", "tools", "js-runtimes", runtimeName)),
-            Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "tools", "js-runtimes", runtimeName))
-        };
+        var platformDir = BundledToolPaths.PlatformDirectory;
 
-        foreach (var root in searchRoots)
+        foreach (var root in BundledToolPaths.GetAppSearchRoots())
         {
-            if (!Directory.Exists(root))
-                continue;
+            var searchDirs = new[]
+            {
+                Path.Combine(root, "tools", "js-runtimes", runtimeName, platformDir),
+                Path.Combine(root, "tools", "js-runtimes", runtimeName)
+            };
+
+            foreach (var searchDir in searchDirs)
+            {
+                if (!Directory.Exists(searchDir))
+                    continue;
+
+                foreach (var binaryName in binaryNames)
+                {
+                    var direct = Path.Combine(searchDir, binaryName);
+                    if (File.Exists(direct))
+                        yield return direct;
+
+                    if (OperatingSystem.IsWindows())
+                    {
+                        var withExe = direct + ".exe";
+                        if (File.Exists(withExe))
+                            yield return withExe;
+                    }
+                }
+            }
 
             foreach (var binaryName in binaryNames)
             {
-                var direct = Path.Combine(root, binaryName);
-                if (File.Exists(direct))
-                    yield return direct;
+                var legacyNames = OperatingSystem.IsWindows()
+                    ? new[] { $"{binaryName}-windows-x86_64.exe", binaryName, $"{binaryName}.exe" }
+                    : new[] { $"{binaryName}-linux-x86_64", binaryName };
 
-                if (OperatingSystem.IsWindows())
+                foreach (var legacyName in legacyNames)
                 {
-                    var withExe = direct + ".exe";
-                    if (File.Exists(withExe))
-                        yield return withExe;
+                    var legacy = Path.Combine(root, "tools", "js-runtimes", legacyName);
+                    if (File.Exists(legacy))
+                        yield return legacy;
                 }
             }
         }

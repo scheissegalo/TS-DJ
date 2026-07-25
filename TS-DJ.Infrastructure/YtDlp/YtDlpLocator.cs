@@ -68,10 +68,24 @@ public sealed class YtDlpLocator
 
     private static IEnumerable<string> GetBundledCandidates()
     {
-        var baseDir = AppContext.BaseDirectory;
-        yield return Path.Combine(baseDir, "tools", "yt-dlp", "yt-dlp");
-        yield return Path.GetFullPath(Path.Combine(baseDir, "..", "tools", "yt-dlp", "yt-dlp"));
-        yield return Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "tools", "yt-dlp", "yt-dlp"));
+        var binaryName = OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp";
+        var platformDir = BundledToolPaths.PlatformDirectory;
+
+        foreach (var root in BundledToolPaths.GetAppSearchRoots())
+        {
+            yield return Path.Combine(root, "tools", "yt-dlp", platformDir, binaryName);
+            yield return Path.Combine(root, "tools", "yt-dlp", binaryName);
+
+            if (OperatingSystem.IsWindows())
+            {
+                yield return Path.Combine(root, "tools", "yt-dlp", "yt-dlp");
+                yield return Path.Combine(root, "tools", "yt-dlp", platformDir, "yt-dlp");
+            }
+            else
+            {
+                yield return Path.Combine(root, "tools", "yt-dlp", "yt-dlp");
+            }
+        }
     }
 
     private static async Task<string?> FindOnPathAsync(CancellationToken cancellationToken)

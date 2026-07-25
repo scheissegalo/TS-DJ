@@ -17,6 +17,8 @@ public sealed class YoutubeDiagnosticsSnapshot
     public string JsRuntimeStatus { get; init; } = "Not detected";
     public string? JsRuntimeName { get; init; }
     public string? JsRuntimePath { get; init; }
+    public string? FfmpegPath { get; init; }
+    public string? FfmpegOrigin { get; init; }
     public string? StatusMessage { get; init; }
 
     public string StatusDisplay => Status switch

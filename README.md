@@ -109,12 +109,18 @@ Saved playlists store the canonical video URL and metadata — not temporary str
 **yt-dlp location** (checked in order):
 
 1. Optional path in **Options → YouTube / yt-dlp**
-2. Bundled binary under `tools/yt-dlp/` next to the application
+2. Bundled binary under `tools/yt-dlp/<platform>/` next to the application
 3. `yt-dlp` on `PATH`
 
-Linux release builds include the bundled yt-dlp binary. Windows builds use a configured path or PATH until a Windows binary is bundled.
+Release builds bundle yt-dlp, QuickJS, and (on Windows) ffmpeg — no manual setup required beyond the .NET 8 runtime.
 
-Playback buffers MP3 in memory after yt-dlp extracts via a short-lived temp file (FFmpeg cannot transcode to stdout with the bundled yt-dlp workflow).
+**JS runtime** (checked in order):
+
+1. Optional path in **Options → YouTube / yt-dlp**
+2. Bundled QuickJS under `tools/js-runtimes/quickjs/<platform>/`
+3. deno, node, or bun on `PATH`
+
+Playback buffers MP3 in memory after yt-dlp extracts via a short-lived temp file (FFmpeg cannot transcode to stdout with the bundled yt-dlp workflow). Windows releases include bundled ffmpeg; on Linux, install ffmpeg via your package manager if it is not on PATH.
 
 ## Build from source
 
@@ -188,5 +194,6 @@ Browser extensions or a local HTTP API can reuse `YoutubeMediaQueueService` / `I
 
 - **TSLib** and adapted components from TS3AudioBot are licensed under [OSL-3.0](LICENSE).
 - See [LICENSE](LICENSE) for full terms.
+- Bundled third-party components (yt-dlp, QuickJS, FFmpeg, etc.) are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 TSLib originates from the [TS3AudioBot](https://github.com/Splamy/TS3AudioBot) project by Splamy and contributors.

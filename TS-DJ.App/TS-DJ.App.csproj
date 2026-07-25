@@ -32,9 +32,13 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="..\tools\yt-dlp\**\*" LinkBase="tools\yt-dlp" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="..\tools\js-runtimes\**\*" LinkBase="tools\js-runtimes" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64' Or '$(RuntimeIdentifier)' == ''">
+    <Content Include="..\tools\yt-dlp\linux-x64\**\*" LinkBase="tools\yt-dlp\linux-x64" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\tools\js-runtimes\quickjs\linux-x64\**\*" LinkBase="tools\js-runtimes\quickjs\linux-x64" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <Content Include="..\tools\js-runtimes\quickjs\win-x64\**\*" LinkBase="tools\js-runtimes\quickjs\win-x64" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

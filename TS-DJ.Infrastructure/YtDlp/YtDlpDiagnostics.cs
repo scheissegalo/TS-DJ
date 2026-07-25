@@ -8,6 +8,7 @@ public sealed class YtDlpDiagnostics
 {
     private readonly YtDlpLocator _locator;
     private readonly JsRuntimeLocator _jsRuntimeLocator;
+    private readonly FfmpegLocator _ffmpegLocator;
     private readonly YtDlpProcessRunner _processRunner;
     private readonly ISettingsService _settingsService;
     private readonly ILogger<YtDlpDiagnostics> _logger;
@@ -17,12 +18,14 @@ public sealed class YtDlpDiagnostics
     public YtDlpDiagnostics(
         YtDlpLocator locator,
         JsRuntimeLocator jsRuntimeLocator,
+        FfmpegLocator ffmpegLocator,
         YtDlpProcessRunner processRunner,
         ISettingsService settingsService,
         ILogger<YtDlpDiagnostics> logger)
     {
         _locator = locator;
         _jsRuntimeLocator = jsRuntimeLocator;
+        _ffmpegLocator = ffmpegLocator;
         _processRunner = processRunner;
         _settingsService = settingsService;
         _logger = logger;
@@ -34,6 +37,7 @@ public sealed class YtDlpDiagnostics
     {
         _locator.InvalidateCache();
         _jsRuntimeLocator.InvalidateCache();
+        _ffmpegLocator.InvalidateCache();
 
         var location = await _locator.LocateAsync(cancellationToken);
         if (location is null)
@@ -62,6 +66,7 @@ public sealed class YtDlpDiagnostics
 
         var settings = await _settingsService.LoadYtDlpSettingsAsync(cancellationToken);
         var jsDetection = await _jsRuntimeLocator.DetectAsync(settings, _processRunner, cancellationToken);
+        var ffmpegLocation = _ffmpegLocator.Locate();
 
         var status = YoutubeDiagnosticsStatus.Ready;
         string? statusMessage = null;
@@ -76,6 +81,11 @@ public sealed class YtDlpDiagnostics
             status = YoutubeDiagnosticsStatus.Degraded;
             statusMessage = "No JS runtime detected. YouTube playback may fail on some videos.";
         }
+        else if (ffmpegLocation is null)
+        {
+            status = YoutubeDiagnosticsStatus.Degraded;
+            statusMessage = "ffmpeg not found. YouTube MP3 extraction may fail.";
+        }
 
         _snapshot = new YoutubeDiagnosticsSnapshot
         {
@@ -86,6 +96,8 @@ public sealed class YtDlpDiagnostics
             JsRuntimeStatus = jsDetection.StatusSummary,
             JsRuntimeName = jsDetection.SelectedRuntime,
             JsRuntimePath = jsDetection.SelectedPath,
+            FfmpegPath = ffmpegLocation?.Path,
+            FfmpegOrigin = ffmpegLocation?.Origin.ToString(),
             StatusMessage = statusMessage
         };
 
@@ -109,6 +121,18 @@ public sealed class YtDlpDiagnostics
             snapshot.YtDlpVersion ?? "unknown");
 
         _logger.LogInformation("YouTube JS runtime: {JsRuntimeStatus}", snapshot.JsRuntimeStatus);
+
+        if (snapshot.FfmpegPath is not null)
+        {
+            _logger.LogInformation(
+                "YouTube ffmpeg: path={Path}, origin={Origin}",
+                snapshot.FfmpegPath,
+                snapshot.FfmpegOrigin ?? "unknown");
+        }
+        else
+        {
+            _logger.LogWarning("YouTube ffmpeg not found (bundled or PATH)");
+        }
 
         if (snapshot.Status == YoutubeDiagnosticsStatus.Degraded)
             _logger.LogWarning("YouTube integration degraded: {Message}", snapshot.StatusMessage);

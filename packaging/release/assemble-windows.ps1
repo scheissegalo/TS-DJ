@@ -61,6 +61,11 @@ Requirements:
 Run:
   TS-DJ.App.exe
 
+Bundled for YouTube playback (no extra setup required):
+  - yt-dlp (tools/yt-dlp/win-x64/)
+  - QuickJS (tools/js-runtimes/quickjs/win-x64/)
+  - ffmpeg (tools/ffmpeg/win-x64/)
+
 libopus.dll is included under lib\x64\ for Opus voice encoding.
 '@ | Set-Content -Path (Join-Path $Stage "INSTALL-windows.txt") -Encoding UTF8
 

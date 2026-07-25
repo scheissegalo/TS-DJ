@@ -10,7 +10,7 @@
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
         "projectName": "TS-DJ.App",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -74,6 +74,8 @@
               "version": "[12.0.4, )"
             },
             "AvaloniaUI.DiagnosticsSupport": {
+              "include": "None",
+              "suppressParent": "All",
               "target": "Package",
               "version": "[2.2.1, )"
             },
@@ -116,6 +118,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj": {
@@ -124,7 +131,7 @@
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj",
         "projectName": "TS-DJ.Audio",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -207,6 +214,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
@@ -215,7 +227,7 @@
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -266,6 +278,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj": {
@@ -274,7 +291,7 @@
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
         "projectName": "TS-DJ.Infrastructure",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -351,6 +368,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj": {
@@ -359,7 +381,7 @@
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
         "projectName": "TS-DJ.TeamSpeak",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -423,6 +445,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/TSLib.csproj": {
@@ -431,7 +458,7 @@
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/TSLib.csproj",
         "projectName": "Splamy.TSLib",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/TSLib.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/",
         "projectStyle": "PackageReference",
         "crossTargeting": true,
@@ -514,6 +541,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     }

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("TeamSpeak 3 DJ client")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.3.4.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.3.4+dd733d2653b848e10ba11442f002bf9d3e82e07a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.3.4+c34ece58fdd0ee6be63c8f36ee6a85ddda38f3db")]
 [assembly: System.Reflection.AssemblyProductAttribute("TS-DJ")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TS-DJ.App")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.3.4.0")]

@@ -1,14 +1,15 @@
 {
   "version": 3,
   "targets": {
-    "net8.0": {}
+    "net8.0": {},
+    "net8.0/linux-x64": {}
   },
   "libraries": {},
   "projectFileDependencyGroups": {
     "net8.0": []
   },
   "packageFolders": {
-    "/home/berni/.nuget/packages/": {}
+    "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget": {}
   },
   "project": {
     "version": "0.3.4",
@@ -16,7 +17,7 @@
       "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
       "projectName": "TS-DJ.Core",
       "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
-      "packagesPath": "/home/berni/.nuget/packages/",
+      "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
       "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
@@ -66,6 +67,11 @@
           }
         },
         "runtimeIdentifierGraphPath": "/home/berni/.dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json"
+      }
+    },
+    "runtimes": {
+      "linux-x64": {
+        "#import": []
       }
     }
   }

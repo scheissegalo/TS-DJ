@@ -55,6 +55,28 @@ jobs:
           -p:Version=${{ env.VERSION }}
           -p:InformationalVersion=${{ env.INFORMATIONAL_VERSION }}
 
+      - name: Load bundled tool versions
+        shell: bash
+        run: |
+          if [ -f packaging/fetch/versions.env ]; then
+            grep -E '^(YTDLP_VERSION|FFMPEG_BUILD)=' packaging/fetch/versions.env >> "$GITHUB_ENV"
+          fi
+
+      - name: Fetch Windows YouTube dependencies
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          & packaging/fetch/fetch-windows-ytdlp.ps1 -PublishDir "publish/win-x64"
+          & packaging/fetch/fetch-windows-ffmpeg.ps1 -PublishDir "publish/win-x64"
+
+      - name: Verify bundled YouTube stack (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          & publish/win-x64/tools/yt-dlp/win-x64/yt-dlp.exe --version
+          & publish/win-x64/tools/js-runtimes/quickjs/win-x64/qjs.exe --version
+          & publish/win-x64/tools/ffmpeg/win-x64/ffmpeg.exe -version
+
       - name: Assemble Linux release zip
         if: matrix.os == 'ubuntu-latest'
         run: |

@@ -7,15 +7,18 @@ public sealed class YtDlpCommandBuilder
 {
     private readonly ISettingsService _settingsService;
     private readonly JsRuntimeLocator _jsRuntimeLocator;
+    private readonly FfmpegLocator _ffmpegLocator;
     private readonly YtDlpProcessRunner _processRunner;
 
     public YtDlpCommandBuilder(
         ISettingsService settingsService,
         JsRuntimeLocator jsRuntimeLocator,
+        FfmpegLocator ffmpegLocator,
         YtDlpProcessRunner processRunner)
     {
         _settingsService = settingsService;
         _jsRuntimeLocator = jsRuntimeLocator;
+        _ffmpegLocator = ffmpegLocator;
         _processRunner = processRunner;
     }
 
@@ -79,6 +82,10 @@ public sealed class YtDlpCommandBuilder
 
         var args = new List<string>();
         args.AddRange(_jsRuntimeLocator.BuildJsRuntimeArgs(settings, detection));
+
+        var ffmpegLocation = _ffmpegLocator.GetYtDlpLocationArgument();
+        if (!string.IsNullOrWhiteSpace(ffmpegLocation))
+            args.AddRange(["--ffmpeg-location", ffmpegLocation]);
 
         if (settings.EnableRemoteEjsComponents)
             args.AddRange(["--remote-components", "ejs:github"]);

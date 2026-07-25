@@ -47,6 +47,11 @@ TS-DJ — Linux x64
 Requirements:
   - .NET 8 runtime (dotnet --list-runtimes)
   - libopus0 (e.g. sudo apt install libopus0)
+  - ffmpeg on PATH for YouTube MP3 extraction (e.g. sudo apt install ffmpeg)
+
+Bundled for YouTube playback:
+  - yt-dlp (tools/yt-dlp/linux-x64/)
+  - QuickJS (tools/js-runtimes/quickjs/linux-x64/)
 
 Run from this folder:
   ./ts-dj
