@@ -48,4 +48,8 @@
     <ProjectReference Include="..\TS-DJ.TeamSpeak\TS-DJ.TeamSpeak.csproj" />
   </ItemGroup>
 
+  <Target Name="PublishUpdater" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' != ''">
+    <Exec Command="dotnet publish &quot;$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../TS-DJ.Updater/TS-DJ.Updater.csproj'))&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained false -o &quot;$(PublishDir)&quot;" />
+  </Target>
+
 </Project>

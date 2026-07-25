@@ -1,6 +1,5 @@
 ﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -10,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TS_DJ.App.Services;
 using TS_DJ.Audio;
+using TS_DJ.Core;
 using TS_DJ.Core.Audio;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
@@ -135,9 +135,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public string SoundboardToggleLabel => IsSoundboardVisible ? "Hide Soundboard" : "Show Soundboard";
 
-    public string ApplicationVersion { get; } =
-        typeof(MainWindowViewModel).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
+    public string ApplicationVersion { get; } = AppVersion.Display;
 
     public string WindowTitle => $"TS-DJ {ApplicationVersion}";
 

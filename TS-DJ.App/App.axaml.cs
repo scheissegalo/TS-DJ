@@ -51,6 +51,8 @@ public partial class App : Application
                 services.AddSingleton<TrackTransitionProfiler>();
                 services.AddSingleton<ITrackTransitionTiming>(sp => sp.GetRequiredService<TrackTransitionProfiler>());
                 services.AddSingleton<ApplicationShutdownService>();
+                services.AddSingleton<UpdatePromptService>();
+                services.AddTransient<UpdateAvailableDialogViewModel>();
 
                 services.AddTransient<OptionsViewModel>();
                 services.AddTransient<TeamSpeakConnectionsOptionsViewModel>();
@@ -100,6 +102,23 @@ public partial class App : Application
             desktop.MainWindow = new MainWindow
             {
                 DataContext = _host.Services.GetRequiredService<MainWindowViewModel>()
+            };
+
+            desktop.MainWindow.Opened += (_, _) =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+                        var updatePrompt = _host.Services.GetRequiredService<UpdatePromptService>();
+                        await updatePrompt.CheckOnStartupAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        appLogger.LogWarning(ex, "Startup update check failed");
+                    }
+                });
             };
 
             desktop.Exit += (_, _) =>

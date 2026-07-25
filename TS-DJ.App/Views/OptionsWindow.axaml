@@ -171,6 +171,24 @@
             <StackPanel Spacing="12" MaxWidth="480">
                 <TextBlock Text="UI preferences" FontSize="16" FontWeight="SemiBold"/>
                 <CheckBox Content="Show soundboard panel on startup" IsChecked="{Binding IsSoundboardVisible}"/>
+
+                <Separator Margin="0,8"/>
+
+                <TextBlock Text="Updates" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding ApplicationVersion, StringFormat=Installed version: {0}}" Opacity="0.85"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Check for updates"
+                            Command="{Binding CheckForUpdatesCommand}"
+                            IsEnabled="{Binding !IsCheckingForUpdates}"/>
+                    <ProgressBar IsIndeterminate="True"
+                                 IsVisible="{Binding IsCheckingForUpdates}"
+                                 Width="120"
+                                 Height="4"
+                                 VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock Text="{Binding UpdateStatusMessage}"
+                           TextWrapping="Wrap"
+                           Opacity="0.85"/>
             </StackPanel>
         </DataTemplate>
     </Window.DataTemplates>

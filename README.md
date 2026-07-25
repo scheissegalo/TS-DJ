@@ -50,6 +50,21 @@ Pre-built release zips are published on [GitHub Releases](https://github.com/sch
 
 Artifacts are **framework-dependent** — install the .NET 8 runtime before running.
 
+## Updates
+
+Release builds check [GitHub Releases](https://github.com/scheissegalo/TS-DJ/releases) for newer versions automatically a few seconds after startup, and you can also use **Options → UI / Preferences → Check for updates**.
+
+When a newer release is available, TS-DJ shows the version and release notes and lets you choose **Update now** or **Later**. On update:
+
+1. The matching platform zip is downloaded (`TS-DJ-<version>-linux-x64.zip` or `...-win-x64.zip`).
+2. A small helper (`TS-DJ.Updater`) waits for the app to exit, overwrites the install folder, and restarts TS-DJ.
+
+Your settings database is stored outside the install directory and is preserved across updates.
+
+Version numbers come from git release tags (`v0.3.5` → app version `0.3.5`). The running app reads its version from the built assembly; GitHub provides the latest tag via the Releases API.
+
+Update checks are disabled for local development builds (`dotnet run`, `bin/Debug`, or installs without `TS-DJ.Updater`).
+
 ## Linux setup
 
 **From release zip:**

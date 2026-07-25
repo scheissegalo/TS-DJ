@@ -1,0 +1,64 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TS_DJ.App.ViewModels"
+        x:Class="TS_DJ.App.Views.UpdateAvailableDialog"
+        x:DataType="vm:UpdateAvailableDialogViewModel"
+        Title="Update available"
+        Width="520"
+        Height="420"
+        MinWidth="420"
+        MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" Margin="16" RowSpacing="10">
+        <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock Text="A new version of TS-DJ is available."
+                       FontSize="16"
+                       FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding CurrentVersionText, StringFormat=Installed: {0}}"
+                       Opacity="0.85"/>
+            <TextBlock Text="{Binding NewVersionText, StringFormat=Available: {0}}"
+                       Opacity="0.85"/>
+        </StackPanel>
+
+        <Border Grid.Row="1"
+                Padding="12"
+                CornerRadius="8"
+                BorderThickness="1"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <TextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap"/>
+            </ScrollViewer>
+        </Border>
+
+        <TextBlock Grid.Row="2"
+                   Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Opacity="0.85"/>
+
+        <ProgressBar Grid.Row="3"
+                     Minimum="0"
+                     Maximum="100"
+                     Value="{Binding DownloadProgress}"
+                     IsVisible="{Binding HasDownloadProgress}"
+                     Height="4"/>
+
+        <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,8,0,0">
+            <Button Grid.Column="0"
+                    Content="View release notes"
+                    Command="{Binding OpenReleasePageCommand}"
+                    HorizontalAlignment="Left"
+                    IsVisible="{Binding HasReleasePage}"/>
+            <Button Grid.Column="1"
+                    Content="Later"
+                    Click="LaterButton_OnClick"
+                    IsEnabled="{Binding !IsBusy}"/>
+            <Button Grid.Column="2"
+                    Content="Update now"
+                    Command="{Binding UpdateNowCommand}"
+                    IsEnabled="{Binding !IsBusy}"
+                    IsDefault="True"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -22,7 +22,7 @@
           "TS-DJ.Core": "0.3.4",
           "TS-DJ.Infrastructure": "0.3.4",
           "TS-DJ.TeamSpeak": "0.3.4",
-          "TSLib": "1.1.0.0"
+          "TSLib": "0.3.4.0"
         },
         "runtime": {
           "TS-DJ.App.dll": {}
@@ -858,7 +858,7 @@
           }
         }
       },
-      "Splamy.TSLib/1.1.0": {
+      "Splamy.TSLib/0.3.4": {
         "dependencies": {
           "Heijden.Dns.Portable": "2.0.19",
           "NLog": "4.7.3",
@@ -869,8 +869,8 @@
         },
         "runtime": {
           "TSLib.dll": {
-            "assemblyVersion": "1.1.0.0",
-            "fileVersion": "1.1.0.0"
+            "assemblyVersion": "0.3.4.0",
+            "fileVersion": "0.3.4.0"
           }
         }
       },
@@ -881,7 +881,7 @@
           "NAudio": "2.2.1",
           "NLayer": "1.15.0",
           "NLayer.NAudioSupport": "1.4.0",
-          "Splamy.TSLib": "1.1.0",
+          "Splamy.TSLib": "0.3.4",
           "TS-DJ.Core": "0.3.4",
           "TS-DJ.TeamSpeak": "0.3.4"
         },
@@ -919,7 +919,7 @@
       "TS-DJ.TeamSpeak/0.3.4": {
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
-          "Splamy.TSLib": "1.1.0",
+          "Splamy.TSLib": "0.3.4",
           "TS-DJ.Core": "0.3.4"
         },
         "runtime": {
@@ -929,11 +929,11 @@
           }
         }
       },
-      "TSLib/1.1.0.0": {
+      "TSLib/0.3.4.0": {
         "runtime": {
           "TSLib.dll": {
-            "assemblyVersion": "1.1.0.0",
-            "fileVersion": "1.1.0.0"
+            "assemblyVersion": "0.3.4.0",
+            "fileVersion": "0.3.4.0"
           }
         }
       }
@@ -1428,7 +1428,7 @@
       "path": "tmds.dbus.protocol/0.92.0",
       "hashPath": "tmds.dbus.protocol.0.92.0.nupkg.sha512"
     },
-    "Splamy.TSLib/1.1.0": {
+    "Splamy.TSLib/0.3.4": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -1453,7 +1453,7 @@
       "serviceable": false,
       "sha512": ""
     },
-    "TSLib/1.1.0.0": {
+    "TSLib/0.3.4.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""

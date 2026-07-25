@@ -1,11 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TS_DJ.Core;
 using TS_DJ.Core.Services;
 using TS_DJ.Infrastructure.Logging;
 using TS_DJ.Infrastructure.Media;
 using TS_DJ.Infrastructure.Navidrome;
 using TS_DJ.Infrastructure.Playlists;
 using TS_DJ.Infrastructure.Settings;
+using TS_DJ.Infrastructure.Updates;
 using TS_DJ.Infrastructure.YtDlp;
 
 namespace TS_DJ.Infrastructure.DependencyInjection;
@@ -31,6 +33,16 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("TS-DJ");
         });
+
+        services.AddHttpClient(UpdateConstants.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"TS-DJ/{AppVersion.Current}");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        });
+
+        services.AddSingleton<GitHubReleaseClient>();
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         services.AddSingleton<NavidromeService>(sp => new NavidromeService(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(NavidromeService.HttpClientName),

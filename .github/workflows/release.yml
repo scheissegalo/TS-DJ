@@ -54,6 +54,7 @@ jobs:
           -o publish/${{ matrix.rid }}
           -p:Version=${{ env.VERSION }}
           -p:InformationalVersion=${{ env.INFORMATIONAL_VERSION }}
+          -p:PublishDir=publish/${{ matrix.rid }}/
 
       - name: Load bundled tool versions
         shell: bash
