@@ -499,6 +499,59 @@ public sealed class SqliteSettingsService : ISettingsService, IDisposable
         }
     }
 
+    public async Task<TeamSpeakCommandSettings> LoadTeamSpeakCommandSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var raw = await ReadSettingAsync(connection, TeamSpeakCommandSettings.ConfigKey, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return new TeamSpeakCommandSettings();
+
+            var settings = JsonSerializer.Deserialize<TeamSpeakCommandSettings>(raw);
+            return settings ?? new TeamSpeakCommandSettings();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to load TeamSpeak command settings from {DatabasePath}", _databasePath);
+            return new TeamSpeakCommandSettings();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SaveTeamSpeakCommandSettingsAsync(
+        TeamSpeakCommandSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(settings);
+            await WriteSettingAsync(connection, transaction, TeamSpeakCommandSettings.ConfigKey, json, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Saved TeamSpeak command settings to {DatabasePath}", _databasePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to save TeamSpeak command settings to {DatabasePath}", _databasePath);
+            throw new InvalidOperationException(
+                $"Could not save TeamSpeak command settings to '{_databasePath}'.", ex);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task<TeamSpeakConnectionProfilesSettings> LoadTeamSpeakConnectionProfilesAsync(
         CancellationToken cancellationToken = default)
     {

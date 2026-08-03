@@ -75,3 +75,7 @@
 /media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/NLayer.dll
 /media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/NLayer.NAudioSupport.dll
 /media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/obj/Debug/net8.0/SmokeTest.sourcelink.json
+/media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/NAudio.Flac.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/Microsoft.Extensions.Diagnostics.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/Microsoft.Extensions.Diagnostics.Abstractions.dll
+/media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/bin/Debug/net8.0/Microsoft.Extensions.Http.dll

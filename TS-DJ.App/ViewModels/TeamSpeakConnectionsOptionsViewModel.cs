@@ -35,6 +35,11 @@ public partial class TeamSpeakConnectionsOptionsViewModel : ViewModelBase
 
     public bool CanSaveProfile => !string.IsNullOrWhiteSpace(EditAddress);
 
+    public string CommandHelpText { get; } =
+        "Chat commands (enable on main window when connected): " +
+        "!stop, !next, !volume 1-100, !yt URL, !ytp URL, !help. " +
+        "Listens in the bot's channel and via private message.";
+
     public TeamSpeakConnectionsOptionsViewModel(
         ILogger<TeamSpeakConnectionsOptionsViewModel> logger,
         ISettingsService settingsService)

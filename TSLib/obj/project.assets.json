@@ -2494,7 +2494,7 @@
     ]
   },
   "packageFolders": {
-    "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget": {}
+    "/home/berni/.nuget/packages/": {}
   },
   "project": {
     "version": "1.1.0",
@@ -2502,7 +2502,7 @@
       "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/TSLib.csproj",
       "projectName": "Splamy.TSLib",
       "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/TSLib.csproj",
-      "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+      "packagesPath": "/home/berni/.nuget/packages/",
       "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/",
       "projectStyle": "PackageReference",
       "crossTargeting": true,

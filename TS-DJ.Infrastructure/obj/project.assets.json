@@ -477,7 +477,7 @@
           "lib/netcoreapp2.1/_._": {}
         }
       },
-      "TS-DJ.Core/0.3.6": {
+      "TS-DJ.Core/0.3.7": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "compile": {
@@ -1157,7 +1157,7 @@
         "version.txt"
       ]
     },
-    "TS-DJ.Core/0.3.6": {
+    "TS-DJ.Core/0.3.7": {
       "type": "project",
       "path": "../TS-DJ.Core/TS-DJ.Core.csproj",
       "msbuildProject": "../TS-DJ.Core/TS-DJ.Core.csproj"
@@ -1170,19 +1170,19 @@
       "Microsoft.Extensions.Http >= 8.0.1",
       "Microsoft.Extensions.Logging >= 8.0.1",
       "Microsoft.Extensions.Logging.Console >= 8.0.1",
-      "TS-DJ.Core >= 0.3.6"
+      "TS-DJ.Core >= 0.3.7"
     ]
   },
   "packageFolders": {
-    "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget": {}
+    "/home/berni/.nuget/packages/": {}
   },
   "project": {
-    "version": "0.3.6",
+    "version": "0.3.7",
     "restore": {
       "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
       "projectName": "TS-DJ.Infrastructure",
       "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
-      "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+      "packagesPath": "/home/berni/.nuget/packages/",
       "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [

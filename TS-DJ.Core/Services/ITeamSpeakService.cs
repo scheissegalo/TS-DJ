@@ -10,6 +10,7 @@ public interface ITeamSpeakService
     event EventHandler<string>? StatusMessage;
     event EventHandler<TeamSpeakChannelInfo>? CurrentChannelChanged;
     event EventHandler<IReadOnlyList<TeamSpeakChannelInfo>>? ChannelsUpdated;
+    event EventHandler<TeamSpeakTextMessage>? TextMessageReceived;
 
     Task ConnectAsync(ConnectionSettings settings, CancellationToken cancellationToken = default);
     Task DisconnectAsync(CancellationToken cancellationToken = default);
@@ -20,4 +21,6 @@ public interface ITeamSpeakService
         CancellationToken cancellationToken = default);
     Task MoveToChannelAsync(string channelId, CancellationToken cancellationToken = default);
     TeamSpeakChannelInfo? GetCurrentChannel();
+    Task SendChannelMessageAsync(string message, CancellationToken cancellationToken = default);
+    Task SendPrivateMessageAsync(string clientId, string message, CancellationToken cancellationToken = default);
 }

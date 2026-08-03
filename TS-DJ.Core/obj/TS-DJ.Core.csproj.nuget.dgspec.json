@@ -5,12 +5,12 @@
   },
   "projects": {
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
-      "version": "0.3.6",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
-        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+        "packagesPath": "/home/berni/.nuget/packages/",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [

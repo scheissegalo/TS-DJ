@@ -3,6 +3,7 @@ Stream system Audio Input to teamspeak
 add Discord support - stream to discord server/channels
 add Mumble support - stream to mumble channels
 Support press enter to search in navidrome
+User commands to start youtube etc.
 
 <!-- Add youtube support - Download and play -->
 <!-- Highlight Playing soundboard item -->

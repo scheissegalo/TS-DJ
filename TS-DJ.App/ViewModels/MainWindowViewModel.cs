@@ -29,9 +29,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IPlaylistService _playlistService;
     private readonly IPlaybackTargetService _playbackTarget;
     private readonly TeamSpeakNicknameService _nicknameService;
+    private readonly TeamSpeakCommandService _commandService;
     private readonly TrackTransitionProfiler _transitionProfiler;
     private readonly DispatcherTimer _progressTimer;
     private CancellationTokenSource? _volumeSaveDebounceCts;
+    private CancellationTokenSource? _commandSettingsSaveDebounceCts;
     private bool _isLoadingSettings;
     private bool _disposed;
     private bool _playbackUiSyncPending;
@@ -46,6 +48,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private bool _showEmptyChannels;
+
+    [ObservableProperty]
+    private bool _userCommandsEnabled;
 
     private bool _isSyncingChannelSelection;
 
@@ -189,6 +194,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         IPlaylistService playlistService,
         IPlaybackTargetService playbackTarget,
         TeamSpeakNicknameService nicknameService,
+        TeamSpeakCommandService commandService,
         TrackTransitionProfiler transitionProfiler,
         SoundboardViewModel soundboardViewModel,
         ConnectionProfileSelectorViewModel connectionProfileSelectorViewModel)
@@ -204,6 +210,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _playlistService = playlistService;
         _playbackTarget = playbackTarget;
         _nicknameService = nicknameService;
+        _commandService = commandService;
         _transitionProfiler = transitionProfiler;
 
         ConnectionProfiles.PropertyChanged += (_, e) =>
@@ -226,6 +233,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioMixerService.AdvancePendingChanged += OnAdvancePendingChanged;
         _audioMixerService.DeckStateChanged += OnDeckStateChanged;
         _logService.EntryAdded += OnLogEntryAdded;
+        _commandService.MusicVolumeChanged += OnCommandMusicVolumeChanged;
 
         _progressTimer = new DispatcherTimer
         {
@@ -266,6 +274,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             PlaybackMode = playbackSettings.Mode;
             CrossfadeEnabled = playbackSettings.CrossfadeEnabled;
             CrossfadeDurationSeconds = playbackSettings.CrossfadeDurationSeconds;
+
+            var commandSettings = await _settingsService.LoadTeamSpeakCommandSettingsAsync();
+            UserCommandsEnabled = commandSettings.Enabled;
+            _commandService.SetEnabled(commandSettings.Enabled);
 
             await RefreshSavedPlaylistsAsync();
         }
@@ -908,6 +920,35 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ScheduleAudioSettingsSave();
     }
 
+    partial void OnUserCommandsEnabledChanged(bool value)
+    {
+        if (_isLoadingSettings)
+            return;
+
+        _commandService.SetEnabled(value);
+        ScheduleCommandSettingsSave();
+    }
+
+    private void OnCommandMusicVolumeChanged(object? sender, int volume)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Math.Abs(Volume - volume) < 0.5)
+                return;
+
+            _isLoadingSettings = true;
+            try
+            {
+                Volume = volume;
+                _audioPlaybackService.Volume = AudioValues.HumanVolumeToFactor((float)volume);
+            }
+            finally
+            {
+                _isLoadingSettings = false;
+            }
+        });
+    }
+
     partial void OnSelectedQueueItemChanged(PlaybackQueueItemViewModel? value) =>
         NotifyCommandStatesChanged();
 
@@ -1009,6 +1050,36 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _volumeSaveDebounceCts?.Dispose();
         _volumeSaveDebounceCts = new CancellationTokenSource();
         _ = DebouncedSaveAudioSettingsAsync(_volumeSaveDebounceCts.Token);
+    }
+
+    private void ScheduleCommandSettingsSave()
+    {
+        if (_isLoadingSettings)
+            return;
+
+        _commandSettingsSaveDebounceCts?.Cancel();
+        _commandSettingsSaveDebounceCts?.Dispose();
+        _commandSettingsSaveDebounceCts = new CancellationTokenSource();
+        _ = DebouncedSaveCommandSettingsAsync(_commandSettingsSaveDebounceCts.Token);
+    }
+
+    private async Task DebouncedSaveCommandSettingsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(300, cancellationToken);
+            await _settingsService.SaveTeamSpeakCommandSettingsAsync(new TeamSpeakCommandSettings
+            {
+                Enabled = UserCommandsEnabled
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            LogError("Failed to save command settings", ex);
+        }
     }
 
     private async Task DebouncedSaveAudioSettingsAsync(CancellationToken cancellationToken)
@@ -1334,6 +1405,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _progressTimer.Stop();
         _volumeSaveDebounceCts?.Cancel();
         _volumeSaveDebounceCts?.Dispose();
+        _commandSettingsSaveDebounceCts?.Cancel();
+        _commandSettingsSaveDebounceCts?.Dispose();
 
         _teamSpeakService.StateChanged -= OnConnectionStateChanged;
         _teamSpeakService.StatusMessage -= OnStatusMessage;
@@ -1345,6 +1418,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioMixerService.AdvancePendingChanged -= OnAdvancePendingChanged;
         _audioMixerService.DeckStateChanged -= OnDeckStateChanged;
         _logService.EntryAdded -= OnLogEntryAdded;
+        _commandService.MusicVolumeChanged -= OnCommandMusicVolumeChanged;
         Soundboard.Dispose();
     }
 }

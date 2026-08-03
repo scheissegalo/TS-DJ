@@ -43,6 +43,7 @@ public partial class App : Application
                 services.AddSingleton<YoutubeMediaQueueService>();
                 services.AddSingleton<IYoutubeMediaQueueService>(sp => sp.GetRequiredService<YoutubeMediaQueueService>());
                 services.AddSingleton<YoutubePlaylistEnrichmentService>();
+                services.AddSingleton<TeamSpeakCommandService>();
                 services.AddTransient<NavidromeBrowserViewModel>();
                 services.AddTransient<YouTubeUrlDialogViewModel>();
                 services.AddSingleton<ConnectionProfileSelectorViewModel>();
@@ -75,6 +76,7 @@ public partial class App : Application
         var logService = _host.Services.GetRequiredService<Core.Services.ILogService>();
         _host.Services.GetRequiredService<ILoggerFactory>().AddProvider(new UiLogProvider(logService));
         _ = _host.Services.GetRequiredService<TeamSpeakDescriptionService>();
+        _ = _host.Services.GetRequiredService<TeamSpeakCommandService>();
 
         var appLogger = _host.Services.GetRequiredService<ILogger<App>>();
         if (TSLib.Audio.Opus.NativeMethods.PreloadLibrary())

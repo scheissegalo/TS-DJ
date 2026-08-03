@@ -5,7 +5,7 @@
   },
   "projects": {
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj": {
-      "version": "1.0.0",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj",
         "projectName": "TS-DJ.Audio",
@@ -54,6 +54,10 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "BunLabs.NAudio.Flac": {
+              "target": "Package",
+              "version": "[2.0.1, )"
+            },
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
               "version": "[8.0.2, )"
@@ -92,7 +96,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
-      "version": "1.0.0",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
@@ -151,7 +155,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj": {
-      "version": "1.0.0",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
         "projectName": "TS-DJ.Infrastructure",
@@ -202,6 +206,10 @@
               "target": "Package",
               "version": "[8.0.2, )"
             },
+            "Microsoft.Extensions.Http": {
+              "target": "Package",
+              "version": "[8.0.1, )"
+            },
             "Microsoft.Extensions.Logging": {
               "target": "Package",
               "version": "[8.0.1, )"
@@ -232,7 +240,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj": {
-      "version": "1.0.0",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
         "projectName": "TS-DJ.TeamSpeak",
@@ -396,7 +404,7 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/SmokeTest.csproj": {
-      "version": "1.0.0",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/tools/SmokeTest/SmokeTest.csproj",
         "projectName": "SmokeTest",

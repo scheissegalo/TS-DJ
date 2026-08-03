@@ -87,20 +87,32 @@ public static partial class YoutubeUrlHelper
     public static bool TryNormalize(string input, out string normalizedUrl)
     {
         normalizedUrl = string.Empty;
-        if (!TryClassify(input, out var classification))
+        if (!TryGetSingleVideoUrl(input, out normalizedUrl))
             return false;
 
-        if (classification.Kind != YoutubeContentKind.SingleVideo
-            || string.IsNullOrWhiteSpace(classification.VideoUrl))
-        {
-            return false;
-        }
-
-        normalizedUrl = classification.VideoUrl;
         return true;
     }
 
-    public static bool TryNormalizePlaylistUrl(string input, out string playlistUrl)
+    /// <summary>
+    /// Returns the canonical video URL when the input is a single video or a watch URL that includes a playlist.
+    /// </summary>
+    public static bool TryGetSingleVideoUrl(string input, out string videoUrl)
+    {
+        videoUrl = string.Empty;
+        if (!TryClassify(input, out var classification))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(classification.VideoUrl))
+            return false;
+
+        videoUrl = classification.VideoUrl;
+        return true;
+    }
+
+    /// <summary>
+    /// Returns the playlist fetch URL for playlist links and watch URLs that include a list parameter.
+    /// </summary>
+    public static bool TryGetPlaylistUrl(string input, out string playlistUrl)
     {
         playlistUrl = string.Empty;
         if (!TryClassify(input, out var classification))
@@ -113,6 +125,15 @@ public static partial class YoutubeUrlHelper
         }
 
         playlistUrl = classification.PlaylistUrl;
+        return true;
+    }
+
+    public static bool TryNormalizePlaylistUrl(string input, out string playlistUrl)
+    {
+        playlistUrl = string.Empty;
+        if (!TryGetPlaylistUrl(input, out playlistUrl))
+            return false;
+
         return true;
     }
 

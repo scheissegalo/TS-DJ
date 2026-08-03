@@ -38,14 +38,10 @@ public sealed class YoutubeMediaSource : IMediaSource, IPlaybackStreamOpener
         string input,
         CancellationToken cancellationToken = default)
     {
-        if (!YoutubeUrlHelper.TryClassify(input, out var classification)
-            || classification.Kind != YoutubeContentKind.SingleVideo
-            || string.IsNullOrWhiteSpace(classification.VideoUrl))
-        {
+        if (!YoutubeUrlHelper.TryGetSingleVideoUrl(input, out var videoUrl))
             return null;
-        }
 
-        var metadata = await _youtubeService.FetchVideoMetadataAsync(classification.VideoUrl, cancellationToken);
+        var metadata = await _youtubeService.FetchVideoMetadataAsync(videoUrl, cancellationToken);
         return CreateQueueItem(metadata);
     }
 

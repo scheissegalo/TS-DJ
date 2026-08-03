@@ -40,6 +40,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
         _voiceTarget = new Ts3VoiceTarget(_client, logger);
         _client.OnDisconnected += OnClientDisconnected;
         _client.OnEachClientMoved += OnClientMoved;
+        _client.OnEachTextMessage += OnTextMessage;
     }
 
     public ConnectionState State => _state;
@@ -48,6 +49,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
     public event EventHandler<string>? StatusMessage;
     public event EventHandler<TeamSpeakChannelInfo>? CurrentChannelChanged;
     public event EventHandler<IReadOnlyList<TeamSpeakChannelInfo>>? ChannelsUpdated;
+    public event EventHandler<TeamSpeakTextMessage>? TextMessageReceived;
 
     public Ts3VoiceTarget VoiceTarget => _voiceTarget;
 
@@ -183,6 +185,71 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
     }
 
     public TeamSpeakChannelInfo? GetCurrentChannel() => _currentChannel;
+
+    public async Task SendChannelMessageAsync(string message, CancellationToken cancellationToken = default)
+    {
+        if (_state != ConnectionState.Connected || string.IsNullOrWhiteSpace(message))
+            return;
+
+        await _scheduler.InvokeAsync(() => _client.SendChannelMessage(message));
+    }
+
+    public async Task SendPrivateMessageAsync(string clientId, string message, CancellationToken cancellationToken = default)
+    {
+        if (_state != ConnectionState.Connected || string.IsNullOrWhiteSpace(message))
+            return;
+
+        if (!ushort.TryParse(clientId, out var parsedId))
+        {
+            _logger.LogWarning("Invalid client id for private message: {ClientId}", clientId);
+            return;
+        }
+
+        var targetId = (ClientId)parsedId;
+        await _scheduler.InvokeAsync(() => _client.SendPrivateMessage(message, targetId));
+    }
+
+    private void OnTextMessage(object? sender, TextMessage msg)
+    {
+        if (_state != ConnectionState.Connected)
+            return;
+
+        if (msg.InvokerId == _client.Book.OwnClient)
+            return;
+
+        switch (msg.Target)
+        {
+            case TextMessageTargetMode.Private:
+                if (msg.TargetClientId != _client.Book.OwnClient)
+                    return;
+                break;
+            case TextMessageTargetMode.Channel:
+                break;
+            case TextMessageTargetMode.Server:
+                return;
+            default:
+                return;
+        }
+
+        var mapped = new TeamSpeakTextMessage
+        {
+            InvokerClientId = msg.InvokerId.ToString(),
+            InvokerName = msg.InvokerName ?? string.Empty,
+            Message = msg.Message ?? string.Empty,
+            Target = MapMessageTarget(msg.Target)
+        };
+
+        TextMessageReceived?.Invoke(this, mapped);
+    }
+
+    private static TeamSpeakMessageTarget MapMessageTarget(TextMessageTargetMode target) =>
+        target switch
+        {
+            TextMessageTargetMode.Private => TeamSpeakMessageTarget.Private,
+            TextMessageTargetMode.Channel => TeamSpeakMessageTarget.Channel,
+            TextMessageTargetMode.Server => TeamSpeakMessageTarget.Server,
+            _ => TeamSpeakMessageTarget.Server
+        };
 
     private async Task<IReadOnlyList<TeamSpeakChannelInfo>> QueryChannelsAsync(bool includeEmpty)
     {
@@ -348,6 +415,7 @@ public sealed class TeamSpeakService : ITeamSpeakService, IDisposable
     {
         _client.OnDisconnected -= OnClientDisconnected;
         _client.OnEachClientMoved -= OnClientMoved;
+        _client.OnEachTextMessage -= OnTextMessage;
 
         if (_state == ConnectionState.Connected && !_closed)
         {

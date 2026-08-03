@@ -28,6 +28,9 @@ public interface ISettingsService
     Task<TeamSpeakConnectionProfilesSettings> LoadTeamSpeakConnectionProfilesAsync(CancellationToken cancellationToken = default);
     Task SaveTeamSpeakConnectionProfilesAsync(TeamSpeakConnectionProfilesSettings settings, CancellationToken cancellationToken = default);
 
+    Task<TeamSpeakCommandSettings> LoadTeamSpeakCommandSettingsAsync(CancellationToken cancellationToken = default);
+    Task SaveTeamSpeakCommandSettingsAsync(TeamSpeakCommandSettings settings, CancellationToken cancellationToken = default);
+
     Task<PlaylistLibrary> LoadPlaylistLibraryAsync(CancellationToken cancellationToken = default);
     Task SavePlaylistLibraryAsync(PlaylistLibrary library, CancellationToken cancellationToken = default);
     Task<SavedPlaylist?> LoadSavedPlaylistAsync(Guid id, CancellationToken cancellationToken = default);

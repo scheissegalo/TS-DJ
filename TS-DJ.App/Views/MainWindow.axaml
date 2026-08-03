@@ -71,6 +71,9 @@
                             </ComboBox>
                             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsConnected}">
                                 <CheckBox Content="Show empty channels" IsChecked="{Binding ShowEmptyChannels}"/>
+                                <CheckBox Content="Allow chat commands"
+                                          IsChecked="{Binding UserCommandsEnabled}"
+                                          ToolTip.Tip="!stop, !next, !volume 1-100, !yt URL, !ytp URL"/>
                                 <Button Content="↻" Command="{Binding RefreshChannelsCommand}" ToolTip.Tip="Refresh channels"/>
                             </StackPanel>
                         </StackPanel>

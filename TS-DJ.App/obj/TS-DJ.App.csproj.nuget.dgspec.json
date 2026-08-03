@@ -5,12 +5,12 @@
   },
   "projects": {
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj": {
-      "version": "0.3.6",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
         "projectName": "TS-DJ.App",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/TS-DJ.App.csproj",
-        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+        "packagesPath": "/home/berni/.nuget/packages/",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -74,8 +74,6 @@
               "version": "[12.0.4, )"
             },
             "AvaloniaUI.DiagnosticsSupport": {
-              "include": "None",
-              "suppressParent": "All",
               "target": "Package",
               "version": "[2.2.1, )"
             },
@@ -121,12 +119,12 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj": {
-      "version": "0.3.6",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj",
         "projectName": "TS-DJ.Audio",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/TS-DJ.Audio.csproj",
-        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+        "packagesPath": "/home/berni/.nuget/packages/",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -212,12 +210,12 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
-      "version": "0.3.6",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
-        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+        "packagesPath": "/home/berni/.nuget/packages/",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -271,12 +269,12 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj": {
-      "version": "0.3.6",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
         "projectName": "TS-DJ.Infrastructure",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
-        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+        "packagesPath": "/home/berni/.nuget/packages/",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -356,12 +354,12 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj": {
-      "version": "0.3.6",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
         "projectName": "TS-DJ.TeamSpeak",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/TS-DJ.TeamSpeak.csproj",
-        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+        "packagesPath": "/home/berni/.nuget/packages/",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.TeamSpeak/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -433,7 +431,7 @@
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/TSLib.csproj",
         "projectName": "Splamy.TSLib",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/TSLib.csproj",
-        "packagesPath": "/tmp/cursor-sandbox-cache/c2061b2a9f8b328598cd894f59da3848/nuget",
+        "packagesPath": "/home/berni/.nuget/packages/",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TSLib/obj/",
         "projectStyle": "PackageReference",
         "crossTargeting": true,
