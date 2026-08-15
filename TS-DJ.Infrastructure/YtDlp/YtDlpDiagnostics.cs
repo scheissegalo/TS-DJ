@@ -68,6 +68,18 @@ public sealed class YtDlpDiagnostics
         var jsDetection = await _jsRuntimeLocator.DetectAsync(settings, _processRunner, cancellationToken);
         var ffmpegLocation = _ffmpegLocator.Locate();
 
+        if (!string.IsNullOrWhiteSpace(jsDetection.ConfiguredPathRuntimeKind)
+            && jsDetection.SelectedOrigin == JsRuntimeOrigin.Configured
+            && !string.IsNullOrWhiteSpace(jsDetection.SelectedRuntime)
+            && !jsDetection.ConfiguredPathRuntimeKind.Equals(jsDetection.SelectedRuntime, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Configured JS runtime path detects '{DetectedKind}' but the preference is '{ConfiguredPreference}'. "
+                + "TS-DJ will use the detected runtime for yt-dlp; update Options → YouTube / yt-dlp if this was not intended.",
+                jsDetection.ConfiguredPathRuntimeKind,
+                jsDetection.SelectedRuntime);
+        }
+
         var status = YoutubeDiagnosticsStatus.Ready;
         string? statusMessage = null;
 

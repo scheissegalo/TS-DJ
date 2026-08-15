@@ -22,6 +22,13 @@ public sealed class JsRuntimeDetection
     public string? SelectedRuntime { get; init; }
     public string? SelectedPath { get; init; }
     public JsRuntimeOrigin? SelectedOrigin { get; init; }
+
+    /// <summary>
+    /// When a custom <c>JsRuntimePath</c> is configured, the runtime kind detected from the
+    /// binary itself (deno/node/bun/quickjs) — used to correct name/path mismatches.
+    /// </summary>
+    public string? ConfiguredPathRuntimeKind { get; init; }
+
     public required IReadOnlyList<JsRuntimeCandidate> Candidates { get; init; }
 
     public string StatusSummary
@@ -70,11 +77,14 @@ public sealed class JsRuntimeLocator
         }
 
         var selected = SelectRuntime(settings, candidates);
+        var configuredPathRuntimeKind = await DetectConfiguredPathRuntimeKindAsync(settings, processRunner, cancellationToken);
+
         _cached = new JsRuntimeDetection
         {
             SelectedRuntime = selected?.Name,
             SelectedPath = selected?.Path,
             SelectedOrigin = selected?.Origin,
+            ConfiguredPathRuntimeKind = configuredPathRuntimeKind,
             Candidates = candidates
         };
 
@@ -90,9 +100,13 @@ public sealed class JsRuntimeLocator
         if (selected is null)
             return [];
 
+        var runtimeName = selected.Name;
+        if (!string.IsNullOrWhiteSpace(selected.Path) && !string.IsNullOrWhiteSpace(detection.ConfiguredPathRuntimeKind))
+            runtimeName = detection.ConfiguredPathRuntimeKind!;
+
         var runtimeArg = string.IsNullOrWhiteSpace(selected.Path)
-            ? selected.Name
-            : $"{selected.Name}:{selected.Path}";
+            ? runtimeName
+            : $"{runtimeName}:{selected.Path}";
 
         var args = new List<string>();
         if (ShouldClearDefaultRuntimes(settings, detection, selected))
@@ -302,6 +316,47 @@ public sealed class JsRuntimeLocator
         catch
         {
             return false;
+        }
+    }
+
+    private static async Task<string?> DetectConfiguredPathRuntimeKindAsync(
+        YtDlpSettings settings,
+        YtDlpProcessRunner processRunner,
+        CancellationToken cancellationToken)
+    {
+        if (settings.JsRuntime == YoutubeJsRuntimePreference.None)
+            return null;
+
+        if (string.IsNullOrWhiteSpace(settings.JsRuntimePath))
+            return null;
+
+        var path = Path.GetFullPath(settings.JsRuntimePath.Trim());
+        if (!File.Exists(path))
+            return null;
+
+        try
+        {
+            var output = (await processRunner.RunCaptureStdoutAsync(
+                path,
+                ["--version"],
+                TimeSpan.FromSeconds(10),
+                cancellationToken)).Trim();
+
+            if (string.IsNullOrWhiteSpace(output))
+                return null;
+
+            var lower = output.ToLowerInvariant();
+            if (lower.Contains("deno"))
+                return "deno";
+            if (lower.Contains("bun"))
+                return "bun";
+            if (output.Length > 1 && output[0] is 'v' or 'V' && char.IsDigit(output[1]))
+                return "node";
+            return null;
+        }
+        catch
+        {
+            return null;
         }
     }
 

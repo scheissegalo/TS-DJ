@@ -91,18 +91,21 @@ public sealed class MediaLoadPrefetchCache
         {
             result = await entry.Task.WaitAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch
         {
-            _entries.TryRemove(item.SourceKey, out _);
-            throw new InvalidOperationException($"Prefetch failed for {item.SourceKey}.", ex);
+            result = null;
         }
 
         _entries.TryRemove(item.SourceKey, out _);
 
-        if (result is null)
-            throw new InvalidOperationException($"Prefetch returned no media for {item.SourceKey}.");
+        if (result is not null)
+            return result;
 
-        return result;
+        _logger?.LogWarning(
+            "Prefetch for {SourceKey} failed; retrying load at transition",
+            item.SourceKey);
+
+        return await _loader.LoadAsync(item, cancellationToken: cancellationToken);
     }
 
     public void Invalidate(string sourceKey)

@@ -134,32 +134,54 @@ public sealed class YtDlpProcessRunner
         var lower = text.ToLowerInvariant();
 
         if (lower.Contains("http error 403") || lower.Contains("403 forbidden") || lower.Contains(" 403 "))
-            return new YtDlpException(
-                "YouTube denied the media download (HTTP 403). Update yt-dlp, configure a JS runtime in Options, or retry playback.");
+            return CreateFailure(
+                "YouTube denied the media download (HTTP 403). Update yt-dlp, configure a JS runtime in Options, or retry playback.",
+                text,
+                isHttp403: true);
 
         if (lower.Contains("private video") || lower.Contains("sign in") || lower.Contains("login"))
-            return new YtDlpException("Video is private or requires sign-in.");
+            return new YtDlpException("Video is private or requires sign-in.", stderr: text);
 
         if (lower.Contains("age") && lower.Contains("restrict"))
-            return new YtDlpException("Video is age-restricted.");
+            return new YtDlpException("Video is age-restricted.", stderr: text);
 
         if (lower.Contains("unviewable") || lower.Contains("playlist type is unviewable"))
             return new YtDlpException(
                 "This YouTube Mix or radio playlist cannot be opened from a playlist link alone. "
-                + "Paste the URL from the video page (watch URL with list= parameter).");
+                + "Paste the URL from the video page (watch URL with list= parameter).",
+                stderr: text);
 
         if (lower.Contains("unavailable") || lower.Contains("removed") || lower.Contains("not available"))
-            return new YtDlpException("Video is unavailable.");
+            return new YtDlpException("Video is unavailable.", stderr: text);
 
         if (lower.Contains("js runtime") || lower.Contains("js challenge") || lower.Contains("ejs"))
             return new YtDlpException(
-                "YouTube requires a JavaScript runtime for this video. Configure one in Options → YouTube / yt-dlp.");
+                "YouTube requires a JavaScript runtime for this video. Configure one in Options → YouTube / yt-dlp.",
+                stderr: text);
 
         if (string.IsNullOrWhiteSpace(text))
             return new YtDlpException($"yt-dlp failed with exit code {exitCode}.");
 
         var firstLine = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? text;
-        return new YtDlpException(firstLine.Length > 200 ? firstLine[..200] : firstLine);
+        var message = firstLine.Length > 200 ? firstLine[..200] : firstLine;
+        return CreateFailure(message, text);
+    }
+
+    private static YtDlpException CreateFailure(string message, string stderr, bool isHttp403 = false)
+    {
+        var tail = GetStderrTail(stderr);
+        var full = tail is null ? message : $"{message}\n--- yt-dlp output (tail) ---\n{tail}";
+        return new YtDlpException(full, isHttp403: isHttp403, stderr: stderr);
+    }
+
+    private static string? GetStderrTail(string stderr)
+    {
+        var text = stderr?.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        const int maxChars = 400;
+        return text.Length <= maxChars ? text : $"…{text[^maxChars..]}";
     }
 
     private static Process CreateProcess(string executable, IReadOnlyList<string> args, bool captureStdout)

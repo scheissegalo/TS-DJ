@@ -143,19 +143,24 @@ public sealed class TeamSpeakCommandService
         if (!YoutubeUrlHelper.TryGetSingleVideoUrl(rawUrl, out var url))
             throw new InvalidOperationException("Invalid YouTube URL.");
 
-        _logger.LogDebug("YouTube !yt command: raw={RawUrl} normalized={Url}", rawUrl, url);
+        var playImmediately = ShouldPlayImmediately();
+        _logger.LogDebug(
+            "YouTube !yt command: raw={RawUrl} normalized={Url} playImmediately={PlayImmediately}",
+            rawUrl,
+            url,
+            playImmediately);
 
         var queueCountBefore = _audioMixerService.Queue.Count;
-        await _youtubeQueue.EnqueueUrlAsync(url, playImmediately: false);
+        await _youtubeQueue.EnqueueUrlAsync(url, playImmediately);
 
         var added = _audioMixerService.Queue
             .Skip(queueCountBefore)
             .LastOrDefault();
 
         if (added is not null)
-            return $"Queued: {added.DisplayName}";
+            return playImmediately ? $"Now playing: {added.DisplayName}" : $"Queued: {added.DisplayName}";
 
-        return "Video queued.";
+        return playImmediately ? "Video playing." : "Video queued.";
     }
 
     private async Task<string> EnqueueYouTubePlaylistAsync(string rawUrl)
@@ -163,16 +168,27 @@ public sealed class TeamSpeakCommandService
         if (!YoutubeUrlHelper.TryGetPlaylistUrl(rawUrl, out var url))
             throw new InvalidOperationException("Invalid YouTube playlist URL.");
 
-        _logger.LogDebug("YouTube !ytp command: raw={RawUrl} normalized={Url}", rawUrl, url);
+        var playImmediately = ShouldPlayImmediately();
+        _logger.LogDebug(
+            "YouTube !ytp command: raw={RawUrl} normalized={Url} playImmediately={PlayImmediately}",
+            rawUrl,
+            url,
+            playImmediately);
 
         var queueCountBefore = _audioMixerService.Queue.Count;
-        await _youtubeQueue.EnqueuePlaylistAsync(url, playImmediately: false, replaceQueue: false);
+        await _youtubeQueue.EnqueuePlaylistAsync(url, playImmediately, replaceQueue: false);
 
         var addedCount = _audioMixerService.Queue.Count - queueCountBefore;
-        return addedCount > 0
-            ? $"Queued {addedCount} tracks."
-            : "Playlist queued.";
+        if (addedCount > 0)
+            return playImmediately
+                ? $"Now playing playlist ({addedCount} tracks queued)."
+                : $"Queued {addedCount} tracks.";
+
+        return playImmediately ? "Playlist playing." : "Playlist queued.";
     }
+
+    private bool ShouldPlayImmediately() =>
+        _audioPlaybackService.State == PlaybackState.Stopped;
 
     private Task ReplyAsync(TeamSpeakTextMessage message, string text)
     {

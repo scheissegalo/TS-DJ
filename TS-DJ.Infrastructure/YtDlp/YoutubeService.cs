@@ -10,6 +10,8 @@ public sealed class YoutubeService : IYoutubeService
     private static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(120);
     private static readonly TimeSpan PlaylistMetadataTimeout = TimeSpan.FromSeconds(300);
     private static readonly TimeSpan StreamTimeout = TimeSpan.FromSeconds(180);
+    private const int MaxExtractionAttempts = 3;
+    private static readonly TimeSpan ExtractionRetryDelay = TimeSpan.FromSeconds(2);
 
     private readonly YtDlpLocator _locator;
     private readonly YtDlpCommandBuilder _commandBuilder;
@@ -180,22 +182,45 @@ public sealed class YoutubeService : IYoutubeService
 
         try
         {
-            await _processRunner.RunAsync(location.Path, args, StreamTimeout, cancellationToken);
+            for (var attempt = 1; ; attempt++)
+            {
+                if (attempt > 1)
+                {
+                    await Task.Delay(ExtractionRetryDelay, cancellationToken);
+                    CleanupPartialOutput(tempDir, tempMp3);
+                }
 
-            if (!File.Exists(tempMp3))
-                throw new YtDlpException("yt-dlp did not produce an audio file.");
+                try
+                {
+                    await _processRunner.RunAsync(location.Path, args, StreamTimeout, cancellationToken);
 
-            var buffer = await File.ReadAllBytesAsync(tempMp3, cancellationToken);
-            if (buffer.Length == 0)
-                throw new YtDlpException("yt-dlp returned no audio data.");
+                    if (!File.Exists(tempMp3))
+                        throw new YtDlpException("yt-dlp did not produce an audio file.");
 
-            _diagnostics.LogPlaybackAttempt(videoId, format, commandLine, success: true);
-            _logger.LogInformation(
-                "YouTube audio extraction succeeded — videoId={VideoId}, bytes={Bytes}",
-                videoId,
-                buffer.Length);
+                    var buffer = await File.ReadAllBytesAsync(tempMp3, cancellationToken);
+                    if (buffer.Length == 0)
+                        throw new YtDlpException("yt-dlp returned no audio data.");
 
-            return new MemoryPlaybackStreamHandle(buffer);
+                    _diagnostics.LogPlaybackAttempt(videoId, format, commandLine, success: true);
+                    _logger.LogInformation(
+                        "YouTube audio extraction succeeded — videoId={VideoId}, bytes={Bytes}",
+                        videoId,
+                        buffer.Length);
+
+                    return new MemoryPlaybackStreamHandle(buffer);
+                }
+                catch (YtDlpException ex) when (
+                    ex.IsHttp403
+                    && attempt < MaxExtractionAttempts
+                    && !cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogWarning(
+                        "YouTube denied the media download (HTTP 403) — retrying ({Attempt}/{MaxAttempts}) videoId={VideoId}",
+                        attempt,
+                        MaxExtractionAttempts,
+                        videoId);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -204,10 +229,7 @@ public sealed class YoutubeService : IYoutubeService
         }
         finally
         {
-            TryDeleteFile(tempMp3);
-            var stem = Path.Combine(tempDir, Path.GetFileNameWithoutExtension(tempMp3));
-            foreach (var suffix in new[] { ".webm", ".m4a", ".opus", ".part", "" })
-                TryDeleteFile(stem + suffix);
+            CleanupPartialOutput(tempDir, tempMp3);
         }
     }
 
@@ -261,6 +283,14 @@ public sealed class YoutubeService : IYoutubeService
             .ToDictionary(parts => parts[0], parts => Uri.UnescapeDataString(parts[1]), StringComparer.OrdinalIgnoreCase);
 
         return query.GetValueOrDefault("v");
+    }
+
+    private static void CleanupPartialOutput(string tempDir, string tempMp3)
+    {
+        TryDeleteFile(tempMp3);
+        var stem = Path.Combine(tempDir, Path.GetFileNameWithoutExtension(tempMp3));
+        foreach (var suffix in new[] { ".webm", ".m4a", ".opus", ".part", "" })
+            TryDeleteFile(stem + suffix);
     }
 
     private static void TryDeleteFile(string path)
