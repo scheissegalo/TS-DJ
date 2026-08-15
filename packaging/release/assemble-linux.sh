@@ -21,6 +21,7 @@ exec "$ROOT/TS-DJ.App" "$@"
 EOF
 chmod +x "$STAGE/ts-dj"
 chmod +x "$STAGE/TS-DJ.App" 2>/dev/null || true
+chmod +x "$STAGE/TS-DJ.Updater" 2>/dev/null || true
 
 mkdir -p "$STAGE/icons"
 for size in 32 48 128 256; do

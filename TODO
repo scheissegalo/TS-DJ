@@ -24,3 +24,23 @@ visual disc's on the dec's we can sratch
 resolution of track total time in the playlist
 
 youtube thumbnail as avatar in TS
+
+Updates fail and hang there
+(base) berni@berni-pc:~/Downloads/TS-DJ-0.3.9-linux-x64$ Extracting /tmp/TS-DJ-update/TS-DJ-0.3.10-linux-x64.zip...
+Installing from /tmp/TS-DJ-update/f6258eec400149dfb438a339f36d0a9e/TS-DJ-0.3.10-linux-x64 into /home/berni/Downloads/TS-DJ-0.3.9-linux-x64/...
+TS-DJ updater failed: Text file busy : '/home/berni/Downloads/TS-DJ-0.3.9-linux-x64/TS-DJ.Updater'
+
+After that the executable does not start anymore:
+(base) berni@berni-pc:~/Downloads/TS-DJ-0.3.9-linux-x64$ ./ts-dj 
+Unhandled exception. System.IO.FileNotFoundException: Could not load file or assembly 'TS-DJ.Infrastructure, Version=0.3.10.0, Culture=neutral, PublicKeyToken=null'. The system cannot find the file specified.
+
+File name: 'TS-DJ.Infrastructure, Version=0.3.10.0, Culture=neutral, PublicKeyToken=null'
+   at TS_DJ.App.App.OnFrameworkInitializationCompleted()
+   at Avalonia.AppBuilder.SetupUnsafe()
+   at Avalonia.AppBuilder.Setup()
+   at Avalonia.AppBuilder.SetupWithLifetime(IApplicationLifetime lifetime)
+   at Avalonia.ClassicDesktopStyleApplicationLifetimeExtensions.StartWithClassicDesktopLifetime(AppBuilder builder, String[] args, Action`1 lifetimeBuilder)
+   at TS_DJ.App.Program.Main(String[] args) in /home/runner/work/TS-DJ/TS-DJ/TS-DJ.App/Program.cs:line 12
+Aborted (core dumped)
+
+Also check github workflow for this project.

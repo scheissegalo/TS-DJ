@@ -53,15 +53,22 @@ internal static class Program
         }
         finally
         {
-            try
-            {
-                if (Directory.Exists(extractRoot))
-                    Directory.Delete(extractRoot, recursive: true);
-            }
-            catch
-            {
-                // Best effort cleanup only.
-            }
+            TryDeleteDirectory(extractRoot);
+            if (options.CleanupDir is not null)
+                TryDeleteDirectory(options.CleanupDir);
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch
+        {
+            // Best effort cleanup only.
         }
     }
 
@@ -118,8 +125,22 @@ internal static class Program
             var relative = Path.GetRelativePath(sourceDir, file);
             var target = Path.Combine(destinationDir, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, overwrite: true);
+            ReplaceFile(file, target);
         }
+    }
+
+    private static void ReplaceFile(string source, string target)
+    {
+        var temp = target + ".new";
+        if (File.Exists(temp))
+            File.Delete(temp);
+
+        File.Copy(source, temp);
+
+        // Rename is atomic on the same filesystem and, on Linux, replaces a
+        // running executable's inode without ETXTBSY. No file is ever left
+        // half-written if the update is interrupted.
+        File.Move(temp, target, overwrite: true);
     }
 
     private static void MakeExecutable(string path)
@@ -154,6 +175,7 @@ internal static class Program
         public required string InstallDir { get; init; }
         public required string PackagePath { get; init; }
         public required string RestartPath { get; init; }
+        public string? CleanupDir { get; init; }
 
         public static UpdaterOptions Parse(string[] args)
         {
@@ -161,6 +183,7 @@ internal static class Program
             string? installDir = null;
             string? packagePath = null;
             string? restartPath = null;
+            string? cleanupDir = null;
 
             for (var i = 0; i < args.Length; i++)
             {
@@ -177,6 +200,9 @@ internal static class Program
                         break;
                     case "--restart" when i + 1 < args.Length:
                         restartPath = args[++i];
+                        break;
+                    case "--cleanup-dir" when i + 1 < args.Length:
+                        cleanupDir = args[++i];
                         break;
                 }
             }
@@ -195,7 +221,8 @@ internal static class Program
                 WaitPid = waitPid.Value,
                 InstallDir = Path.GetFullPath(installDir),
                 PackagePath = Path.GetFullPath(packagePath),
-                RestartPath = Path.GetFullPath(restartPath)
+                RestartPath = Path.GetFullPath(restartPath),
+                CleanupDir = string.IsNullOrWhiteSpace(cleanupDir) ? null : Path.GetFullPath(cleanupDir)
             };
         }
     }
