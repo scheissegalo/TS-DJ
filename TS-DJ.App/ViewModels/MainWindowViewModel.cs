@@ -172,11 +172,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool HasQueuedItemsRemaining =>
         _audioMixerService.Queue.Any(i => i.Status == PlaybackQueueStatus.Queued);
 
-    public ObservableCollection<LogEntry> LogEntries { get; } = [];
-
     public ObservableCollection<TeamSpeakChannelInfo> AvailableChannels { get; } = [];
-
-    public event EventHandler<LogEntry>? LogEntryAppended;
 
     public TrackTransitionProfiler TransitionProfiler => _transitionProfiler;
 
@@ -232,7 +228,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioMixerService.NowPlayingChanged += OnNowPlayingChanged;
         _audioMixerService.AdvancePendingChanged += OnAdvancePendingChanged;
         _audioMixerService.DeckStateChanged += OnDeckStateChanged;
-        _logService.EntryAdded += OnLogEntryAdded;
         _commandService.MusicVolumeChanged += OnCommandMusicVolumeChanged;
 
         _progressTimer = new DispatcherTimer
@@ -240,9 +235,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             Interval = TimeSpan.FromMilliseconds(250)
         };
         _progressTimer.Tick += (_, _) => UpdateProgressDisplay();
-
-        foreach (var entry in _logService.Entries)
-            LogEntries.Add(entry);
 
         RefreshQueue();
         UpdateNowPlayingDisplay();
@@ -1345,18 +1337,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             : $"{time.Minutes}:{time.Seconds:D2}";
     }
 
-    private void OnLogEntryAdded(object? sender, LogEntry entry)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            LogEntries.Add(entry);
-            while (LogEntries.Count > LogService.MaxLogEntries)
-                LogEntries.RemoveAt(0);
-
-            LogEntryAppended?.Invoke(this, entry);
-        });
-    }
-
     private void NotifyCommandStatesChanged()
     {
         OnPropertyChanged(nameof(CanConnect));
@@ -1417,7 +1397,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _audioMixerService.NowPlayingChanged -= OnNowPlayingChanged;
         _audioMixerService.AdvancePendingChanged -= OnAdvancePendingChanged;
         _audioMixerService.DeckStateChanged -= OnDeckStateChanged;
-        _logService.EntryAdded -= OnLogEntryAdded;
         _commandService.MusicVolumeChanged -= OnCommandMusicVolumeChanged;
         Soundboard.Dispose();
     }

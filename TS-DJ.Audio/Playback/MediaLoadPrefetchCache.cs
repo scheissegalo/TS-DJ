@@ -14,6 +14,8 @@ public sealed class MediaLoadPrefetchCache
     private readonly IMediaPlaybackLoader _loader;
     private readonly ILogger<MediaLoadPrefetchCache>? _logger;
     private readonly ConcurrentDictionary<string, PrefetchEntry> _entries = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, DateTime> _lastAttemptUtc = new(StringComparer.Ordinal);
+    private static readonly TimeSpan PrefetchRetryCooldown = TimeSpan.FromSeconds(15);
 
     public MediaLoadPrefetchCache(
         IMediaPlaybackLoader loader,
@@ -32,18 +34,27 @@ public sealed class MediaLoadPrefetchCache
             return;
 
         var key = item.SourceKey;
+        if (WithinRetryCooldown(key))
+            return;
+
         _entries.AddOrUpdate(
             key,
             _ => new PrefetchEntry(CreateTask(item)),
             (_, existing) =>
             {
-                if (!existing.Task.IsCompleted)
+                if (existing.Task.IsCompletedSuccessfully && existing.Task.Result is not null)
                     return existing;
 
                 existing.DisposeResult();
                 return new PrefetchEntry(CreateTask(item));
             });
+
+        _lastAttemptUtc[key] = DateTime.UtcNow;
     }
+
+    private bool WithinRetryCooldown(string key) =>
+        _lastAttemptUtc.TryGetValue(key, out var last)
+        && DateTime.UtcNow - last < PrefetchRetryCooldown;
 
     public void PrefetchNextQueued(IReadOnlyList<PlaybackQueueItem> queue, bool crossfadeEnabled)
     {
@@ -118,6 +129,8 @@ public sealed class MediaLoadPrefetchCache
     {
         foreach (var key in _entries.Keys.ToList())
             Invalidate(key);
+
+        _lastAttemptUtc.Clear();
     }
 
     private Task<MediaLoadResult?> CreateTask(PlaybackQueueItem item) =>

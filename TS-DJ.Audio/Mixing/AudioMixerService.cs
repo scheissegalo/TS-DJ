@@ -27,6 +27,7 @@ public sealed class AudioMixerService : IAudioMixerService
     private readonly CrossfadeController _crossfade;
     private readonly List<PlaybackQueueItem> _queue = [];
     private readonly Stack<PlaybackQueueItem> _playHistory = [];
+    private readonly HashSet<string> _advanceInFlight = new(StringComparer.Ordinal);
     private float _masterVolume = AudioValues.HumanVolumeToFactor(50f);
     private int _encoderBitrateKbps = OpusBitratePresets.Default;
     private PlaybackQueueItem? _nowPlaying;
@@ -1034,6 +1035,12 @@ public sealed class AudioMixerService : IAudioMixerService
 
     private void ScheduleAsyncAdvanceToItem(PlaybackQueueItem target)
     {
+        lock (_sync)
+        {
+            if (!_advanceInFlight.Add(target.SourceKey))
+                return;
+        }
+
         SetAdvancePending(true);
         _ = Task.Run(async () =>
         {
@@ -1043,6 +1050,8 @@ public sealed class AudioMixerService : IAudioMixerService
             }
             finally
             {
+                lock (_sync)
+                    _advanceInFlight.Remove(target.SourceKey);
                 SetAdvancePending(false);
             }
         });
@@ -1066,7 +1075,7 @@ public sealed class AudioMixerService : IAudioMixerService
         lock (_sync)
         {
             var queueItem = _queue.FirstOrDefault(i => i.SourceKey == target.SourceKey);
-            if (queueItem is null || queueItem.Status == PlaybackQueueStatus.Failed)
+            if (queueItem is null || queueItem.Status != PlaybackQueueStatus.Queued)
             {
                 loadResult.StreamHandle?.Dispose();
                 return;
@@ -1103,7 +1112,7 @@ public sealed class AudioMixerService : IAudioMixerService
         lock (_sync)
         {
             var item = _queue.FirstOrDefault(i => i.SourceKey == sourceKey);
-            if (item is not null)
+            if (item is not null && item.Status != PlaybackQueueStatus.Playing)
                 item.Status = PlaybackQueueStatus.Failed;
         }
 
@@ -1114,8 +1123,12 @@ public sealed class AudioMixerService : IAudioMixerService
     {
         lock (_sync)
         {
-            if (index >= 0 && index < _queue.Count)
+            if (index >= 0
+                && index < _queue.Count
+                && _queue[index].Status != PlaybackQueueStatus.Playing)
+            {
                 _queue[index].Status = PlaybackQueueStatus.Failed;
+            }
         }
 
         RaiseQueueChanged();

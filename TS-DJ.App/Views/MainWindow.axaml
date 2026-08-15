@@ -24,8 +24,8 @@
 
     <Grid ColumnDefinitions="*,Auto" Margin="16" ColumnSpacing="12">
 
-        <!-- Main column: connection, playback, log -->
-        <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+        <!-- Main column: connection, playback -->
+        <Grid Grid.Column="0" RowDefinitions="Auto,*" RowSpacing="12">
 
             <!-- Connection -->
             <Border Grid.Row="0" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
@@ -83,7 +83,8 @@
 
             <!-- Playback -->
             <Border Grid.Row="1" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
-                <StackPanel Spacing="10">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Top" Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="Playback" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock Grid.Column="1" Text="{Binding PlaybackStatus}" VerticalAlignment="Center" Opacity="0.8"/>
@@ -182,9 +183,10 @@
                         <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding MasterVolume}" TickFrequency="10"/>
                         <TextBlock Grid.Column="2" Text="{Binding MasterVolume, StringFormat={}{0:0}}" VerticalAlignment="Center" MinWidth="28"/>
                     </Grid>
+                </StackPanel>
 
-                    <DockPanel LastChildFill="True">
-                        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,4">
+                <DockPanel LastChildFill="True">
+                    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,4">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="Queue" VerticalAlignment="Center" Opacity="0.85"/>
                                 <Button Content="Save…" Command="{Binding SavePlaylistCommand}" IsEnabled="{Binding HasQueueItems}"/>
@@ -213,7 +215,7 @@
                         <ListBox x:Name="QueueListBox"
                                  ItemsSource="{Binding QueueItems}"
                                  SelectedItem="{Binding SelectedQueueItem}"
-                                 Height="180"
+                                 MinHeight="80"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  DoubleTapped="QueueListBox_OnDoubleTapped">
@@ -240,31 +242,10 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                    </DockPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- Log -->
-            <Border Grid.Row="2" Padding="12" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
-                <DockPanel LastChildFill="True">
-                    <TextBlock DockPanel.Dock="Top" Text="Log" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    <ListBox x:Name="LogListBox"
-                             ItemsSource="{Binding LogEntries}">
-                        <ListBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel />
-                            </ItemsPanelTemplate>
-                        </ListBox.ItemsPanel>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}" FontFamily="Consolas, Courier New, monospace" FontSize="12"/>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                </DockPanel>
                 </DockPanel>
             </Border>
 
-            <TextBlock Grid.Row="3" Text="{Binding ApplicationVersion, StringFormat=TS-DJ {0}}" Opacity="0.5" HorizontalAlignment="Right"/>
         </Grid>
 
         <!-- Soundboard sidebar (collapsible) -->

@@ -3,61 +3,9 @@ Stream system Audio Input to teamspeak
 add Discord support - stream to discord server/channels
 add Mumble support - stream to mumble channels
 Support press enter to search in navidrome
-remove log window from UI
 
-Manually queued files play most of the time, via command mostly they fail:
-
-info: TS_DJ.TeamSpeak.TeamSpeakService[0]
-      Voice transmission ended (no active sources during read) — 53 packets, 12620 bytes sent
-info: TS_DJ.Infrastructure.YtDlp.YoutubeService[0]
-      Starting YouTube audio extraction — videoId=OWFHQKm5EVs, format=bestaudio, command=/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/yt-dlp/linux-x64/yt-dlp --js-runtimes quickjs:/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/js-runtimes/quickjs/linux-x64/qjs --ffmpeg-location /usr/bin -f bestaudio -x --audio-format mp3 --audio-quality 0 --postprocessor-args "ffmpeg:-ar 44100 -ac 2" -o /tmp/ts-dj-ytdlp/f7863a2b7f9f4b759f73e005267f25ab.mp3 --no-playlist --no-warnings -- https://www.youtube.com/watch?v=OWFHQKm5EVs
-[youtube] Extracting URL: https://www.youtube.com/watch?v=OWFHQKm5EVs
-[youtube] OWFHQKm5EVs: Downloading webpage
-[youtube] OWFHQKm5EVs: Downloading android vr player API JSON
-[info] OWFHQKm5EVs: Downloading 1 format(s): 251
-warn: TS_DJ.Infrastructure.YtDlp.YtDlpDiagnostics[0]
-      YouTube playback failed — videoId=OWFHQKm5EVs, format=bestaudio, command=/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/yt-dlp/linux-x64/yt-dlp --js-runtimes quickjs:/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/js-runtimes/quickjs/linux-x64/qjs --ffmpeg-location /usr/bin -f bestaudio -x --audio-format mp3 --audio-quality 0 --postprocessor-args "ffmpeg:-ar 44100 -ac 2" -o /tmp/ts-dj-ytdlp/f7863a2b7f9f4b759f73e005267f25ab.mp3 --no-playlist --no-warnings -- https://www.youtube.com/watch?v=OWFHQKm5EVs
-      TS_DJ.Infrastructure.YtDlp.YtDlpException: YouTube denied the media download (HTTP 403). Update yt-dlp, configure a JS runtime in Options, or retry playback.
-         at TS_DJ.Infrastructure.YtDlp.YtDlpProcessRunner.RunAsync(String executable, IReadOnlyList`1 args, TimeSpan timeout, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/YtDlp/YtDlpProcessRunner.cs:line 44
-         at TS_DJ.Infrastructure.YtDlp.YoutubeService.ExtractAudioAsync(String videoUrl, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/YtDlp/YoutubeService.cs:line 183
-warn: TS_DJ.Audio.Playback.MediaLoadPrefetchCache[0]
-      Media prefetch failed for https://www.youtube.com/watch?v=OWFHQKm5EVs; playback will retry at transition
-      TS_DJ.Infrastructure.YtDlp.YtDlpException: YouTube denied the media download (HTTP 403). Update yt-dlp, configure a JS runtime in Options, or retry playback.
-         at TS_DJ.Infrastructure.YtDlp.YtDlpProcessRunner.RunAsync(String executable, IReadOnlyList`1 args, TimeSpan timeout, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/YtDlp/YtDlpProcessRunner.cs:line 44
-         at TS_DJ.Infrastructure.YtDlp.YoutubeService.ExtractAudioAsync(String videoUrl, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/YtDlp/YoutubeService.cs:line 183
-         at TS_DJ.Infrastructure.Media.YoutubeMediaSource.OpenPlaybackStreamAsync(PlaybackQueueItem item, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/Media/YoutubeMediaSource.cs:line 86
-         at TS_DJ.Audio.Media.MediaPlaybackLoader.LoadCoreAsync(PlaybackQueueItem item, IPlaybackStreamHandle prefetchedStream, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/Media/MediaPlaybackLoader.cs:line 74
-         at TS_DJ.Audio.Media.MediaPlaybackLoader.LoadAsync(PlaybackQueueItem item, IPlaybackStreamHandle prefetchedStream, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/Media/MediaPlaybackLoader.cs:line 41
-         at TS_DJ.Audio.Playback.MediaLoadPrefetchCache.<>c__DisplayClass13_0.<<CreateTask>b__0>d.MoveNext() in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/Playback/MediaLoadPrefetchCache.cs:line 125
-fail: TS_DJ.Audio.Mixing.AudioMixerService[0]
-      Failed to load media for https://www.youtube.com/watch?v=OWFHQKm5EVs
-      System.InvalidOperationException: Prefetch returned no media for https://www.youtube.com/watch?v=OWFHQKm5EVs.
-         at TS_DJ.Audio.Playback.MediaLoadPrefetchCache.WaitForReadyAsync(PlaybackQueueItem item, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/Playback/MediaLoadPrefetchCache.cs:line 103
-         at TS_DJ.Audio.Mixing.AudioMixerService.LoadMediaForItemAsync(PlaybackQueueItem item, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/Mixing/AudioMixerService.cs:line 1096
-         at TS_DJ.Audio.Mixing.AudioMixerService.AdvanceToQueueItemAsync(PlaybackQueueItem target, CancellationToken cancellationToken) in /media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Audio/Mixing/AudioMixerService.cs:line 1056
-
-Doing it manually:
-
-info: TS_DJ.Infrastructure.YtDlp.YoutubeService[0]
-      Starting YouTube audio extraction — videoId=OWFHQKm5EVs, format=bestaudio, command=/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/yt-dlp/linux-x64/yt-dlp --js-runtimes quickjs:/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/js-runtimes/quickjs/linux-x64/qjs --ffmpeg-location /usr/bin -f bestaudio -x --audio-format mp3 --audio-quality 0 --postprocessor-args "ffmpeg:-ar 44100 -ac 2" -o /tmp/ts-dj-ytdlp/1bf13538ffa74bccb2e78ea2517a5416.mp3 --no-playlist --no-warnings -- https://www.youtube.com/watch?v=OWFHQKm5EVs
-[youtube] Extracting URL: https://www.youtube.com/watch?v=OWFHQKm5EVs
-[youtube] OWFHQKm5EVs: Downloading webpage
-[youtube] OWFHQKm5EVs: Downloading android vr player API JSON
-[info] OWFHQKm5EVs: Downloading 1 format(s): 251
-[download] Destination: /tmp/ts-dj-ytdlp/1bf13538ffa74bccb2e78ea2517a5416.webm
-[download] 100% of    4.07MiB in 00:00:00 at 5.55MiB/s
-[ExtractAudio] Destination: /tmp/ts-dj-ytdlp/1bf13538ffa74bccb2e78ea2517a5416.mp3
-Deleting original file /tmp/ts-dj-ytdlp/1bf13538ffa74bccb2e78ea2517a5416.webm (pass -k to keep)
-info: TS_DJ.Infrastructure.YtDlp.YtDlpDiagnostics[0]
-      YouTube playback resolved — videoId=OWFHQKm5EVs, format=bestaudio, command=/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/yt-dlp/linux-x64/yt-dlp --js-runtimes quickjs:/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.App/bin/Debug/net8.0/tools/js-runtimes/quickjs/linux-x64/qjs --ffmpeg-location /usr/bin -f bestaudio -x --audio-format mp3 --audio-quality 0 --postprocessor-args "ffmpeg:-ar 44100 -ac 2" -o /tmp/ts-dj-ytdlp/1bf13538ffa74bccb2e78ea2517a5416.mp3 --no-playlist --no-warnings -- https://www.youtube.com/watch?v=OWFHQKm5EVs
-info: TS_DJ.Infrastructure.YtDlp.YoutubeService[0]
-      YouTube audio extraction succeeded — videoId=OWFHQKm5EVs, bytes=8458034
-
-Anyway i think the JSRuntime sometimes fail and then hangs, as i get the same error, then restarting solves the issue and all is working.
-Looks like the JS Runtimes sometimes crashes or hangs whateve but is not loading, thats when youtube denies the download.
-
+<!-- remove log window from UI -->
 <!-- User commands to start youtube etc. -->
-
 <!-- Add youtube support - Download and play -->
 <!-- Highlight Playing soundboard item -->
 <!-- Options as seperate window, add teamspeak connections here, options to add multiple servers here stored as favorites. On main window we instead have a dropdown with favorites. -->
@@ -75,5 +23,4 @@ visual disc's on the dec's we can sratch
 
 resolution of track total time in the playlist
 
-Issues:
-Log still does not auto scroll to last entry
+youtube thumbnail as avatar in TS

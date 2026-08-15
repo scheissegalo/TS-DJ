@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TS_DJ.Core.Models;
@@ -18,6 +19,8 @@ public sealed class YoutubeService : IYoutubeService
     private readonly YtDlpProcessRunner _processRunner;
     private readonly YtDlpDiagnostics _diagnostics;
     private readonly ILogger<YoutubeService> _logger;
+
+    private readonly ConcurrentDictionary<string, Task<IPlaybackStreamHandle>> _extractionTasks = new(StringComparer.Ordinal);
 
     public YoutubeService(
         YtDlpLocator locator,
@@ -162,6 +165,49 @@ public sealed class YoutubeService : IYoutubeService
     public async Task<IPlaybackStreamHandle> ExtractAudioAsync(
         string videoUrl,
         CancellationToken cancellationToken = default)
+    {
+        var key = TryGetVideoId(videoUrl) ?? videoUrl;
+
+        while (true)
+        {
+            if (_extractionTasks.TryGetValue(key, out var inFlight))
+                return await inFlight.WaitAsync(cancellationToken);
+
+            var tcs = new TaskCompletionSource<IPlaybackStreamHandle>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            if (!_extractionTasks.TryAdd(key, tcs.Task))
+                continue;
+
+            _ = RunExtractionAndCompleteAsync(key, tcs, videoUrl, cancellationToken);
+            return await tcs.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    private async Task RunExtractionAndCompleteAsync(
+        string key,
+        TaskCompletionSource<IPlaybackStreamHandle> tcs,
+        string videoUrl,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var handle = await ExtractAudioCoreAsync(videoUrl, cancellationToken);
+            tcs.TrySetResult(handle);
+        }
+        catch (Exception ex)
+        {
+            tcs.TrySetException(ex);
+        }
+        finally
+        {
+            _extractionTasks.TryRemove(new KeyValuePair<string, Task<IPlaybackStreamHandle>>(key, tcs.Task));
+        }
+    }
+
+    private async Task<IPlaybackStreamHandle> ExtractAudioCoreAsync(
+        string videoUrl,
+        CancellationToken cancellationToken)
     {
         var location = await RequireYtDlpAsync(cancellationToken);
         var videoId = TryGetVideoId(videoUrl) ?? videoUrl;
