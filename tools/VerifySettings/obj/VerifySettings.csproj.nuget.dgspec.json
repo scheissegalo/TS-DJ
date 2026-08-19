@@ -5,12 +5,12 @@
   },
   "projects": {
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj": {
-      "version": "0.3.3",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
         "projectName": "TS-DJ.Core",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/TS-DJ.Core.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/4ae68fe856791a7f4453b645007e0bc3/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Core/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -64,12 +64,12 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj": {
-      "version": "0.3.3",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
         "projectName": "TS-DJ.Infrastructure",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/TS-DJ.Infrastructure.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/4ae68fe856791a7f4453b645007e0bc3/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/TS-DJ.Infrastructure/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -149,12 +149,12 @@
       }
     },
     "/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/VerifySettings.csproj": {
-      "version": "0.3.3",
+      "version": "0.3.7",
       "restore": {
         "projectUniqueName": "/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/VerifySettings.csproj",
         "projectName": "VerifySettings",
         "projectPath": "/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/VerifySettings.csproj",
-        "packagesPath": "/home/berni/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/4ae68fe856791a7f4453b645007e0bc3/nuget",
         "outputPath": "/media/berni/FatExt2TB/clones/TS-DJ/tools/VerifySettings/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [

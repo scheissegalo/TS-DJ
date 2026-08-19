@@ -135,6 +135,17 @@ Release builds bundle yt-dlp, QuickJS, and (on Windows) ffmpeg — no manual set
 2. Bundled QuickJS under `tools/js-runtimes/quickjs/<platform>/`
 3. deno, node, or bun on `PATH`
 
+**Cookies (recommended):** YouTube often rejects guest media downloads with HTTP 403. In **Options → YouTube / yt-dlp**, set **Cookies** to **File** (Netscape `cookies.txt`) or **Browser** (`firefox`, `chrome`, `chromium`, `brave`, or `edge`).
+
+To export a cookie file that stays valid:
+
+1. Open a private/incognito window and log into YouTube.
+2. In that same tab, open `https://www.youtube.com/robots.txt`.
+3. Export `youtube.com` cookies with a cookies.txt extension, then close the private window so the session is not rotated.
+4. Point TS-DJ at that file. Treat it as account credentials — do not share it.
+
+See [yt-dlp cookie export](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies). Logged-in sessions may only offer muxed video+audio (no standalone `bestaudio`); TS-DJ falls back to a small muxed stream and extracts MP3.
+
 Playback buffers MP3 in memory after yt-dlp extracts via a short-lived temp file (FFmpeg cannot transcode to stdout with the bundled yt-dlp workflow). Windows releases include bundled ffmpeg; on Linux, install ffmpeg via your package manager if it is not on PATH.
 
 ## Build from source

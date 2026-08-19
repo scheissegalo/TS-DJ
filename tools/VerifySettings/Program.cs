@@ -121,10 +121,21 @@ try
         Environment.Exit(1);
     }
 
-    var ytdlpSettings = new YtDlpSettings { ExecutablePath = "/usr/bin/yt-dlp" };
+    var ytdlpSettings = new YtDlpSettings
+    {
+        ExecutablePath = "/usr/bin/yt-dlp",
+        CookieSource = YoutubeCookieSource.File,
+        CookieFilePath = "/tmp/cookies.txt",
+        CookiesFromBrowser = "firefox",
+        AudioFormatSelector = YtDlpSettings.DefaultAudioFormatSelector
+    };
     await service.SaveYtDlpSettingsAsync(ytdlpSettings);
     var loadedYtdlp = await service.LoadYtDlpSettingsAsync();
-    if (loadedYtdlp.ExecutablePath != "/usr/bin/yt-dlp")
+    if (loadedYtdlp.ExecutablePath != "/usr/bin/yt-dlp" ||
+        loadedYtdlp.CookieSource != YoutubeCookieSource.File ||
+        loadedYtdlp.CookieFilePath != "/tmp/cookies.txt" ||
+        loadedYtdlp.CookiesFromBrowser != "firefox" ||
+        loadedYtdlp.AudioFormatSelector != YtDlpSettings.DefaultAudioFormatSelector)
     {
         Console.Error.WriteLine("yt-dlp settings round-trip mismatch.");
         Environment.Exit(1);

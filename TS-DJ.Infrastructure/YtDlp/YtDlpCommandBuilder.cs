@@ -48,9 +48,7 @@ public sealed class YtDlpCommandBuilder
         CancellationToken cancellationToken = default)
     {
         var settings = await _settingsService.LoadYtDlpSettingsAsync(cancellationToken);
-        var format = string.IsNullOrWhiteSpace(settings.AudioFormatSelector)
-            ? "bestaudio"
-            : settings.AudioFormatSelector.Trim();
+        var format = ResolveAudioFormatSelector(settings.AudioFormatSelector);
 
         var args = new List<string>();
         args.AddRange(await BuildCommonArgsAsync(cancellationToken));
@@ -70,9 +68,7 @@ public sealed class YtDlpCommandBuilder
     public async Task<string> GetAudioFormatSelectorAsync(CancellationToken cancellationToken = default)
     {
         var settings = await _settingsService.LoadYtDlpSettingsAsync(cancellationToken);
-        return string.IsNullOrWhiteSpace(settings.AudioFormatSelector)
-            ? "bestaudio"
-            : settings.AudioFormatSelector.Trim();
+        return ResolveAudioFormatSelector(settings.AudioFormatSelector);
     }
 
     private async Task<IReadOnlyList<string>> BuildCommonArgsAsync(CancellationToken cancellationToken)
@@ -87,9 +83,51 @@ public sealed class YtDlpCommandBuilder
         if (!string.IsNullOrWhiteSpace(ffmpegLocation))
             args.AddRange(["--ffmpeg-location", ffmpegLocation]);
 
+        args.AddRange(BuildCookieArgs(settings));
+
         if (settings.EnableRemoteEjsComponents)
             args.AddRange(["--remote-components", "ejs:github"]);
 
         return args;
+    }
+
+    internal static IReadOnlyList<string> BuildCookieArgs(YtDlpSettings settings)
+    {
+        switch (settings.CookieSource)
+        {
+            case YoutubeCookieSource.File:
+            {
+                var path = settings.CookieFilePath.Trim();
+                if (string.IsNullOrWhiteSpace(path))
+                    throw new YtDlpException(
+                        "YouTube cookie file is enabled but no path is set. Configure it in Options → YouTube / yt-dlp.");
+
+                var fullPath = Path.GetFullPath(path);
+                if (!File.Exists(fullPath))
+                    throw new YtDlpException($"YouTube cookie file not found: {fullPath}");
+
+                return ["--cookies", fullPath];
+            }
+            case YoutubeCookieSource.Browser:
+            {
+                var browser = settings.CookiesFromBrowser.Trim();
+                if (string.IsNullOrWhiteSpace(browser))
+                    throw new YtDlpException(
+                        "YouTube cookies-from-browser is enabled but no browser is set. Use firefox, chrome, chromium, brave, or edge.");
+
+                return ["--cookies-from-browser", browser];
+            }
+            default:
+                return [];
+        }
+    }
+
+    internal static string ResolveAudioFormatSelector(string? selector)
+    {
+        if (string.IsNullOrWhiteSpace(selector) ||
+            string.Equals(selector.Trim(), "bestaudio", StringComparison.OrdinalIgnoreCase))
+            return YtDlpSettings.DefaultAudioFormatSelector;
+
+        return selector.Trim();
     }
 }

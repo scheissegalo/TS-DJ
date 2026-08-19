@@ -135,12 +135,17 @@ public sealed class YtDlpProcessRunner
 
         if (lower.Contains("http error 403") || lower.Contains("403 forbidden") || lower.Contains(" 403 "))
             return CreateFailure(
-                "YouTube denied the media download (HTTP 403). Update yt-dlp, configure a JS runtime in Options, or retry playback.",
+                "YouTube denied the media download (HTTP 403). Configure cookies in Options → YouTube / yt-dlp, update yt-dlp, or retry playback.",
                 text,
                 isHttp403: true);
 
+        if (lower.Contains("requested format is not available"))
+            return new YtDlpException(
+                "YouTube did not offer the requested audio format. Configure cookies in Options, or use a format fallback such as bestaudio/best.",
+                stderr: text);
+
         if (lower.Contains("private video") || lower.Contains("sign in") || lower.Contains("login"))
-            return new YtDlpException("Video is private or requires sign-in.", stderr: text);
+            return new YtDlpException("Video is private or requires sign-in. Configure cookies in Options → YouTube / yt-dlp.", stderr: text);
 
         if (lower.Contains("age") && lower.Contains("restrict"))
             return new YtDlpException("Video is age-restricted.", stderr: text);

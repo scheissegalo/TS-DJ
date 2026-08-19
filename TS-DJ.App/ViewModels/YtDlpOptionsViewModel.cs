@@ -1,6 +1,10 @@
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using TS_DJ.App.Views;
 using TS_DJ.Core.Models;
 using TS_DJ.Core.Services;
 using TS_DJ.Infrastructure.YtDlp;
@@ -29,6 +33,20 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
     private bool _enableRemoteEjsComponents = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCookieFilePath))]
+    [NotifyPropertyChangedFor(nameof(ShowCookiesFromBrowser))]
+    private YoutubeCookieSource _cookieSource = YoutubeCookieSource.None;
+
+    [ObservableProperty]
+    private string _cookieFilePath = string.Empty;
+
+    [ObservableProperty]
+    private string _cookiesFromBrowser = string.Empty;
+
+    [ObservableProperty]
+    private string _audioFormatSelector = YtDlpSettings.DefaultAudioFormatSelector;
+
+    [ObservableProperty]
     private string _resolvedPathDisplay = "Not resolved";
 
     [ObservableProperty]
@@ -45,6 +63,13 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
 
     public IReadOnlyList<YoutubeJsRuntimePreference> JsRuntimeOptions { get; } =
         Enum.GetValues<YoutubeJsRuntimePreference>();
+
+    public IReadOnlyList<YoutubeCookieSource> CookieSourceOptions { get; } =
+        Enum.GetValues<YoutubeCookieSource>();
+
+    public bool ShowCookieFilePath => CookieSource == YoutubeCookieSource.File;
+
+    public bool ShowCookiesFromBrowser => CookieSource == YoutubeCookieSource.Browser;
 
     public YtDlpOptionsViewModel(
         ILogger<YtDlpOptionsViewModel> logger,
@@ -68,6 +93,12 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
             JsRuntimePath = settings.JsRuntimePath;
             JsRuntime = settings.JsRuntime;
             EnableRemoteEjsComponents = settings.EnableRemoteEjsComponents;
+            CookieSource = settings.CookieSource;
+            CookieFilePath = settings.CookieFilePath;
+            CookiesFromBrowser = settings.CookiesFromBrowser;
+            AudioFormatSelector = string.IsNullOrWhiteSpace(settings.AudioFormatSelector)
+                ? YtDlpSettings.DefaultAudioFormatSelector
+                : settings.AudioFormatSelector;
             await RefreshDiagnosticsAsync();
         }
         catch (Exception ex)
@@ -100,6 +131,12 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
 
     partial void OnEnableRemoteEjsComponentsChanged(bool value) => ScheduleSave();
 
+    partial void OnCookieSourceChanged(YoutubeCookieSource value) => ScheduleSave();
+
+    partial void OnCookieFilePathChanged(string value) => ScheduleSave();
+
+    partial void OnCookiesFromBrowserChanged(string value) => ScheduleSave();
+
     [RelayCommand]
     private async Task TestYtDlpAsync()
     {
@@ -116,6 +153,14 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
         TestResult = snapshot.Status == YoutubeDiagnosticsStatus.Ready
             ? $"OK — v{snapshot.YtDlpVersion ?? "?"}"
             : snapshot.StatusMessage ?? snapshot.StatusDisplay;
+    }
+
+    [RelayCommand]
+    private async Task BrowseCookieFileAsync()
+    {
+        var path = await PickCookieFileAsync();
+        if (!string.IsNullOrWhiteSpace(path))
+            CookieFilePath = path;
     }
 
     private async Task RefreshDiagnosticsAsync()
@@ -155,7 +200,13 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
                 ExecutablePath = ExecutablePath.Trim(),
                 JsRuntimePath = JsRuntimePath.Trim(),
                 JsRuntime = JsRuntime,
-                EnableRemoteEjsComponents = EnableRemoteEjsComponents
+                EnableRemoteEjsComponents = EnableRemoteEjsComponents,
+                AudioFormatSelector = string.IsNullOrWhiteSpace(AudioFormatSelector)
+                    ? YtDlpSettings.DefaultAudioFormatSelector
+                    : AudioFormatSelector.Trim(),
+                CookieSource = CookieSource,
+                CookieFilePath = CookieFilePath.Trim(),
+                CookiesFromBrowser = CookiesFromBrowser.Trim()
             }, cancellationToken);
             _ytDlpLocator.InvalidateCache();
         }
@@ -166,5 +217,29 @@ public partial class YtDlpOptionsViewModel : ViewModelBase
         {
             _logger.LogError(ex, "Failed to save yt-dlp settings");
         }
+    }
+
+    private static async Task<string?> PickCookieFileAsync()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return null;
+
+        var window = desktop.Windows.OfType<OptionsWindow>().FirstOrDefault()
+                     ?? desktop.MainWindow as Window;
+        if (window is null)
+            return null;
+
+        var files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select Netscape cookies.txt",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Cookies") { Patterns = ["*.txt"] },
+                new FilePickerFileType("All files") { Patterns = ["*"] }
+            ]
+        });
+
+        return files.Count == 0 ? null : files[0].Path.LocalPath;
     }
 }
